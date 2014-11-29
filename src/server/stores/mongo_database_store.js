@@ -33,6 +33,10 @@ BetaJS.Stores.ConversionStore.extend("BetaJS.Stores.MongoDatabaseStore", {
             opts.key_encoding[foreign_id] = "id";
 		}
 		this._inherited(BetaJS.Stores.MongoDatabaseStore, "constructor", store, opts);
+	},
+	
+	table: function () {
+		return this.store().table();
 	}
 
 });

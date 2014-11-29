@@ -1,5 +1,5 @@
 /*!
-betajs-server - v1.0.0 - 2014-10-02
+betajs-server - v1.0.0 - 2014-11-28
 Copyright (c) Oliver Friedmann
 MIT Software License.
 */
@@ -67,18 +67,24 @@ BetaJS.Net.AbstractAjax.extend("BetaJS.Server.Net.HttpAjax", {
 });
 
 BetaJS.Class.extend("BetaJS.Server.Net.Controller", {}, {
+	
+	_beforeDispatch : function(method, request, response, callback) {
+		callback.call(this);
+	},
 
 	dispatch : function(method, request, response, next) {
-		var self = this;
-		self[method](request, response, {
-			success : function() {
-				if (BetaJS.Types.is_defined(next))
-					next();
-			},
-			exception : function(e) {
-				e = BetaJS.Server.Net.ControllerException.ensure(e);
-				response.status(e.code()).send(JSON.stringify(e.data()));
-			}
+		this._beforeDispatch(method, request, response, function () {
+			var self = this;
+			self[method](request, response, {
+				success : function() {
+					if (BetaJS.Types.is_defined(next))
+						next();
+				},
+				exception : function(e) {
+					e = BetaJS.Server.Net.ControllerException.ensure(e);
+					response.status(e.code()).send(JSON.stringify(e.data()));
+				}
+			});
 		});
 	}
 	
@@ -102,6 +108,24 @@ BetaJS.Exceptions.Exception.extend("BetaJS.Server.Net.ControllerException", {
 	}
 	
 });
+
+
+BetaJS.Server.Net.SessionControllerMixin = {
+	
+	_obtainSession: function (session_manager, session_cookie_key, method, request, response, callback) {
+		session_manager.obtain_session(request.cookies[session_cookie_key], {}, {
+			success: function (session) {
+				request.session = session;
+				response.cookie(session_cookie_key, session.cid(), {
+					maxAge: session_manager.options().invalidation.session_timeout
+				});
+				callback.call(this);
+			},
+			context: this
+		});
+	}
+		
+};
 
 BetaJS.Class.extend("BetaJS.Server.Net.Imap", [
 	BetaJS.Events.EventsMixin,
@@ -736,6 +760,10 @@ BetaJS.Class.extend("BetaJS.Server.Session.PersistentSessionManagerHelper", {
         	}));
         }
         this.__table = this._auto_destroy(new BetaJS.Modelling.Table(this.__store, this._persistent_session_model));
+        if (!this._persistent_session_model.table)
+        	this._persistent_session_model.table = this.__table;
+        manager.table = this.__table;
+        manager.store = this.__store;
 	},
 	
 	__lookup_session: function (token, callbacks) {
@@ -762,7 +790,7 @@ BetaJS.Class.extend("BetaJS.Server.Session.PersistentSessionManagerHelper", {
 				token: session.cid(),
 				created: BetaJS.Time.now()
 			});
-			session_options.model.save();
+			session_options.model.save({});
 		}
 		session.model = session_options.model;
 		session.model.session = session;
@@ -1322,6 +1350,10 @@ BetaJS.Stores.ConversionStore.extend("BetaJS.Stores.MongoDatabaseStore", {
             opts.key_encoding[foreign_id] = "id";
 		}
 		this._inherited(BetaJS.Stores.MongoDatabaseStore, "constructor", store, opts);
+	},
+	
+	table: function () {
+		return this.store().table();
 	}
 
 });

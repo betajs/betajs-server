@@ -27,6 +27,10 @@ BetaJS.Class.extend("BetaJS.Server.Session.PersistentSessionManagerHelper", {
         	}));
         }
         this.__table = this._auto_destroy(new BetaJS.Modelling.Table(this.__store, this._persistent_session_model));
+        if (!this._persistent_session_model.table)
+        	this._persistent_session_model.table = this.__table;
+        manager.table = this.__table;
+        manager.store = this.__store;
 	},
 	
 	__lookup_session: function (token, callbacks) {
@@ -53,7 +57,7 @@ BetaJS.Class.extend("BetaJS.Server.Session.PersistentSessionManagerHelper", {
 				token: session.cid(),
 				created: BetaJS.Time.now()
 			});
-			session_options.model.save();
+			session_options.model.save({});
 		}
 		session.model = session_options.model;
 		session.model.session = session;
