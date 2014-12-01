@@ -1,5 +1,5 @@
 /*!
-betajs-server - v1.0.0 - 2014-11-28
+betajs-server - v1.0.0 - 2014-11-29
 Copyright (c) Oliver Friedmann
 MIT Software License.
 */
@@ -759,9 +759,9 @@ BetaJS.Class.extend("BetaJS.Server.Session.PersistentSessionManagerHelper", {
 			    delay : options.invalidation.timer
         	}));
         }
-        this.__table = this._auto_destroy(new BetaJS.Modelling.Table(this.__store, this._persistent_session_model));
         if (!this._persistent_session_model.table)
-        	this._persistent_session_model.table = this.__table;
+        	this._persistent_session_model.table = this._auto_destroy(new BetaJS.Modelling.Table(this.__store, this._persistent_session_model));
+        this.__table = this._persistent_session_model.table;
         manager.table = this.__table;
         manager.store = this.__store;
 	},
