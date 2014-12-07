@@ -1,26 +1,12 @@
 BetaJS.Databases.DatabaseTable.extend("BetaJS.Databases.MongoDatabaseTable", {
 	
-	constructor: function (database, table_name) {
-		this._inherited(BetaJS.Databases.MongoDatabaseTable, "constructor", database, table_name);
-	},
-	
-	table_sync: function (callbacks) {
-		return this.eitherSyncFactory("__table_sync", callbacks, function () {
-			return this._database.mongodb_sync().getCollection(this._table_name);
-		});		
-	},
-	
-	table_async: function (callbacks) {
-		var self = this;
-		return this.eitherAsyncFactory("__table_async", callbacks, function () {
-			this._database.mongodb_async(BetaJS.SyncAsync.mapSuccess(callbacks, function (db) {
-				BetaJS.SyncAsync.callback(callbacks, "success", db.collection(self._table_name));
-			}));
-		});
-	},
-	
-	table: function (callbacks) {
-		return this.either(callbacks, this.table_sync, this.table_async);
+	table: function () {
+		if (this.__table)
+			return BetaJS.Promise.create(this.__table);
+		return this._database.mongodb().mapSuccess(function (db) {
+			this.__table = db.collection(this._table_name);
+			return this.__table;
+		}, this);
 	},
 	
 	_encode: function (data) {
@@ -42,9 +28,9 @@ BetaJS.Databases.DatabaseTable.extend("BetaJS.Databases.MongoDatabaseTable", {
 		return obj;
 	},
 
-	_find: function (query, options, callbacks) {
-		return this.then(this.table, callbacks, function (table, callbacks) {
-			this.thenSingle(table, table.find, [query], callbacks, function (result, callbacks) {
+	_find: function (query, options) {
+		return this.table().mapSuccess(function (table) {
+			return BetaJS.Promise.funcCallback(table, table.find, query).mapSuccess(function (result) {
 				options = options || {};
 				if ("sort" in options)
 					result = result.sort(options.sort);
@@ -52,43 +38,42 @@ BetaJS.Databases.DatabaseTable.extend("BetaJS.Databases.MongoDatabaseTable", {
 					result = result.skip(options.skip);
 				if ("limit" in options)
 					result = result.limit(options.limit);
-				this.thenSingle(result, result.toArray, callbacks, function (cols, callbacks) {
-					BetaJS.SyncAsync.callback(callbacks, "success", new BetaJS.Iterators.ArrayIterator(cols));
-				});
-			});
-		});
+				return BetaJS.Promise.funcCallback(result, result.toArray).mapSuccess(function (cols) {
+					return new BetaJS.Iterators.ArrayIterator(cols);
+				}, this);
+			}, this);
+		}, this);
 	},
 
-	_insertRow: function (row, callbacks) {
-		return this.then(this.table, callbacks, function (table, callbacks) {
-			this.thenSingle(table, table.insert, [row], callbacks, function (result, callbacks) {
-				BetaJS.SyncAsync.callback(callbacks, "success", result[0] ? result[0] : result);
-			});
-		});
+	_insertRow: function (row) {
+		console.log("Go", row);
+		return this.table().mapSuccess(function (table) {
+			return BetaJS.Promise.funcCallback(table, table.insert, row).mapSuccess(function (result) {
+				return result[0] ? result[0] : result;
+			}, this);
+		}, this);
 	},
 	
 	_removeRow: function (query, callbacks) {
-		return this.then(this.table, callbacks, function (table, callbacks) {
-			this.thenSingle(table, table.remove, [query], callbacks);
-		});
+		return this.table().mapSuccess(function (table) {
+			return BetaJS.Promise.funcCallback(table, table.remove, query); 
+		}, this);
 	},
 	
 	_updateRow: function (query, row, callbacks) {
-		return this.then(this.table, callbacks, function (table, callbacks) {
-			this.thenSingle(table, table.update, [query, {"$set" : row}], callbacks, function (result, callbacks) {
-				BetaJS.SyncAsync.callback(callbacks, "success", row);
-			});
-		});
+		console.log("Flow", query, row);
+		return this.table().mapSuccess(function (table) {
+			return BetaJS.Promise.funcCallback(table, table.update, query, {"$set" : row}).mapSuccess(function () {
+				return row;
+			}); 
+		}, this);
 	},
 		
 	ensureIndex: function (key) {
 		var obj = {};
 		obj[key] = 1;
-		this.table({
-			success: function (table) {
-				table.ensureIndex(obj, function () {
-				});
-			}
+		this.table().success(function (table) {
+			table.ensureIndex(BetaJS.Objs.objectBy(key, 1));
 		});
 	}	
 

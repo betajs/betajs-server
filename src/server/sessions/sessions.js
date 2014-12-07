@@ -44,32 +44,26 @@ BetaJS.Class.extend("BetaJS.Server.Sessions.Manager", [
     	this.__sessions.iterate(cb, ctx || this);
     },
 
-    obtain_session: function (token, options, callbacks) {
-    	this.find_session(token, {
-    		context: this,
-    		success: function (session) {
-    			BetaJS.SyncAsync.callback(callbacks, "success", session || this.new_session(token, options));
-    		}
-    	});
+    obtain_session: function (token, options) {
+    	return this.find_session(token).mapSuccess(function (session) {
+    		return session || this.new_session(token, options);
+    	}, this);
     },
     
     __generate_token: function () {
     	return BetaJS.Tokens.generate_token();
     },
     
-    __lookup_session: function (token, callbacks) {
-    	this._helper({
+    __lookup_session: function (token) {
+    	return this._helper({
     		method: "__lookup_session",
-    		callbacks: callbacks
-    	}, token, callbacks);
+    		async: true
+    	}, token);
     },
     
-    find_session: function (token, callbacks) {
+    find_session: function (token) {
     	var session = this.__sessions.get(token);
-    	if (session)
-    		BetaJS.SyncAsync.callback(callbacks, "success", session);
-    	else
-    		this.__lookup_session(token, callbacks);
+    	return session ? BetaJS.Promise.create(session) : this.__lookup_session(token);
     },
     
     __add_session: function (session) {
@@ -78,7 +72,7 @@ BetaJS.Class.extend("BetaJS.Server.Sessions.Manager", [
     },
     
     new_session: function (token, options) {
-        session = new this._session_class(this, token || this.__generate_token(), options);
+        var session = new this._session_class(this, token || this.__generate_token(), options);
         this.__add_session(session);
         return session;
     },
@@ -114,7 +108,7 @@ BetaJS.Class.extend("BetaJS.Server.Sessions.Session", [
     constructor: function (manager, token, options) {
         this._inherited(BetaJS.Server.Sessions.Session, "constructor");
         this.__manager = manager;
-        this.__options = options;
+        this.__options = options || {};
         BetaJS.Ids.objectId(this, token);
         this.initiation_time = BetaJS.Time.now();
         this.active_time = this.initiation_time;

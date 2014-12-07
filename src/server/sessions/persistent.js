@@ -33,31 +33,20 @@ BetaJS.Class.extend("BetaJS.Server.Session.PersistentSessionManagerHelper", {
         manager.store = this.__store;
 	},
 	
-	__lookup_session: function (token, callbacks) {
-		this.__table.findBy({token: token}, {
-			context: this,
-			success: function (model) {
-				if (model) {
-					var session = this.__manager.new_session(token, {
-						model: model
-					});
-					BetaJS.SyncAsync.callback(callbacks, "success", session);
-				} else
-					BetaJS.SyncAsync.callback(callbacks, "success", null);
-			}, failure: function () {
-				BetaJS.SyncAsync.callback(callbacks, "success", null);
-			}
-		});
+	__lookup_session: function (token) {
+		return this.__table.findBy({token: token}).mapCallback(function (err, model) {
+			return model && !err ? this.__manager.new_session(token, { model: model }) : null;
+		}, this);
 	},
 	
 	__add_session: function (session) {
 		var session_options = session.options();
 		if (!session_options.model) {
-			session_options.model = new this._persistent_session_model({
+			session_options.model = this.__table.newModel({
 				token: session.cid(),
 				created: BetaJS.Time.now()
 			});
-			session_options.model.save({});
+			session_options.model.save();
 		}
 		session.model = session_options.model;
 		session.model.session = session;
@@ -70,17 +59,14 @@ BetaJS.Class.extend("BetaJS.Server.Session.PersistentSessionManagerHelper", {
     invalidate: function () {
     	if (this.__options.invalidation.session_timeout) {
     		var time = BetaJS.Time.now() - this.__options.invalidation.session_timeout;
-    		this.__table.allBy({"created" : {"$lt": time}}, {}, {
-    			context: this,
-    			success: function (iter) {
-    				while (iter.hasNext()) {
-    					var model = iter.next();
-    					if (model.session)
-    						this.__manager.delete_session(model.session);
-    					model.remove();
-    				}
-    			}
-    		});
+    		this.__table.allBy({"created" : {"$lt": time}}).success(function (iter) {
+				while (iter.hasNext()) {
+					var model = iter.next();
+					if (model.session)
+						this.__manager.delete_session(model.session);
+					model.remove();
+				}
+    		}, this);
     	}
     }
 	

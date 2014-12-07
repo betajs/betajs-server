@@ -34,13 +34,14 @@ BetaJS.Class.extend("BetaJS.Server.Net.Imap", [
 		this._inherited(BetaJS.Server.Net.Imap, "destroy");
 	},
 	
-	connect: function (callbacks) {
+	connect: function () {
 		if (this.__connected)
-			return;
+			return BetaJS.Promise.value(true);
 		this.__count = 0;
 		var self = this;
+		var promise = BetaJS.Promise.create();
 		var f = function () {
-			BetaJS.SyncAsync.callback(callbacks, "exception");
+			promise.error(true);
 			self.off("error", f);
 		};
 		this.on("error", f);
@@ -54,9 +55,8 @@ BetaJS.Class.extend("BetaJS.Server.Net.Imap", [
 			var err = null;
 			var worker = function () {
 			    if (boxes.length === 0) {
-                    BetaJS.SyncAsync.callback(callbacks, "exception", err);
+			    	promise.error(err);
                     self.__connected = false;
-                    throw err;
                 }
                 var box = boxes.shift();
                 self.__imap.openBox(box, true, function (error, box) {
@@ -69,12 +69,13 @@ BetaJS.Class.extend("BetaJS.Server.Net.Imap", [
                     self.__imap.on('mail', function (count) {
                         self.trigger("new_mail", count);
                     });
-                    BetaJS.SyncAsync.callback(callbacks, "success");
+                    promise.asyncSuccess(true);
                 });
 			};
 			self.off("error", f);
 			worker();
 		});
+		return promise;
 	},
 	
 	disconnect: function () {
@@ -131,10 +132,10 @@ BetaJS.Class.extend("BetaJS.Server.Net.Imap", [
 			bodies : bodies,
 			struct : true
 		});
-		this.__query(f, callbacks);
+		return this.__query(f);
 	},
 	
-	__query: function (f, callbacks) {
+	__query: function (f) {
 		var self = this;
 		var mails = [];
 		f.on('message', function(msg, seqno) {
@@ -161,12 +162,14 @@ BetaJS.Class.extend("BetaJS.Server.Net.Imap", [
 				} catch (e) {}
 			});
 		});
+		var promise = BetaJS.Promise.create(); 
 		f.once('error', function(err) {
-			BetaJS.SyncAsync.callback(callbacks, "exception", err);
+			promise.asyncError(err);
 		});
 		f.once('end', function() {
-			BetaJS.SyncAsync.callback(callbacks, "success", mails);
+			promise.asyncSuccess(mails);
 		});			
+		return promise;
 	},
 	
 	__parse: function (header, body, attrs) {

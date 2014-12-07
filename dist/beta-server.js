@@ -1,5 +1,5 @@
 /*!
-betajs-server - v1.0.0 - 2014-11-29
+betajs-server - v1.0.0 - 2014-12-06
 Copyright (c) Oliver Friedmann
 MIT Software License.
 */
@@ -68,23 +68,24 @@ BetaJS.Net.AbstractAjax.extend("BetaJS.Server.Net.HttpAjax", {
 
 BetaJS.Class.extend("BetaJS.Server.Net.Controller", {}, {
 	
-	_beforeDispatch : function(method, request, response, callback) {
-		callback.call(this);
+	_beforeDispatch : function(method, request, response) {
+		return BetaJS.Promise.create(true);
 	},
 
 	dispatch : function(method, request, response, next) {
-		this._beforeDispatch(method, request, response, function () {
-			var self = this;
-			self[method](request, response, {
-				success : function() {
-					if (BetaJS.Types.is_defined(next))
-						next();
-				},
-				exception : function(e) {
-					e = BetaJS.Server.Net.ControllerException.ensure(e);
-					response.status(e.code()).send(JSON.stringify(e.data()));
-				}
+		this._beforeDispatch(method, request, response).success(function () {
+			var result = this[method](request, response);
+			result = BetaJS.Promise.is(result) ? result : BetaJS.Promise.create(true);
+			result.success(function () {
+				if (BetaJS.Types.is_defined(next))
+					next();
+			}).error(function (e) {
+				e = BetaJS.Server.Net.ControllerException.ensure(e);
+				response.status(e.code()).send(JSON.stringify(e.data()));
 			});
+		}, this).error(function (e) {
+			e = BetaJS.Server.Net.ControllerException.ensure(e);
+			response.status(e.code()).send(JSON.stringify(e.data()));
 		});
 	}
 	
@@ -112,16 +113,13 @@ BetaJS.Exceptions.Exception.extend("BetaJS.Server.Net.ControllerException", {
 
 BetaJS.Server.Net.SessionControllerMixin = {
 	
-	_obtainSession: function (session_manager, session_cookie_key, method, request, response, callback) {
-		session_manager.obtain_session(request.cookies[session_cookie_key], {}, {
-			success: function (session) {
-				request.session = session;
-				response.cookie(session_cookie_key, session.cid(), {
-					maxAge: session_manager.options().invalidation.session_timeout
-				});
-				callback.call(this);
-			},
-			context: this
+	_obtainSession: function (session_manager, session_cookie_key, method, request, response) {
+		return session_manager.obtain_session(request.cookies[session_cookie_key]).mapSuccess(function (session) {
+			request.session = session;
+			response.cookie(session_cookie_key, session.cid(), {
+				maxAge: session_manager.options().invalidation.session_timeout
+			});
+			return session;
 		});
 	}
 		
@@ -163,13 +161,14 @@ BetaJS.Class.extend("BetaJS.Server.Net.Imap", [
 		this._inherited(BetaJS.Server.Net.Imap, "destroy");
 	},
 	
-	connect: function (callbacks) {
+	connect: function () {
 		if (this.__connected)
-			return;
+			return BetaJS.Promise.value(true);
 		this.__count = 0;
 		var self = this;
+		var promise = BetaJS.Promise.create();
 		var f = function () {
-			BetaJS.SyncAsync.callback(callbacks, "exception");
+			promise.error(true);
 			self.off("error", f);
 		};
 		this.on("error", f);
@@ -183,9 +182,8 @@ BetaJS.Class.extend("BetaJS.Server.Net.Imap", [
 			var err = null;
 			var worker = function () {
 			    if (boxes.length === 0) {
-                    BetaJS.SyncAsync.callback(callbacks, "exception", err);
+			    	promise.error(err);
                     self.__connected = false;
-                    throw err;
                 }
                 var box = boxes.shift();
                 self.__imap.openBox(box, true, function (error, box) {
@@ -198,12 +196,13 @@ BetaJS.Class.extend("BetaJS.Server.Net.Imap", [
                     self.__imap.on('mail', function (count) {
                         self.trigger("new_mail", count);
                     });
-                    BetaJS.SyncAsync.callback(callbacks, "success");
+                    promise.asyncSuccess(true);
                 });
 			};
 			self.off("error", f);
 			worker();
 		});
+		return promise;
 	},
 	
 	disconnect: function () {
@@ -260,10 +259,10 @@ BetaJS.Class.extend("BetaJS.Server.Net.Imap", [
 			bodies : bodies,
 			struct : true
 		});
-		this.__query(f, callbacks);
+		return this.__query(f);
 	},
 	
-	__query: function (f, callbacks) {
+	__query: function (f) {
 		var self = this;
 		var mails = [];
 		f.on('message', function(msg, seqno) {
@@ -290,12 +289,14 @@ BetaJS.Class.extend("BetaJS.Server.Net.Imap", [
 				} catch (e) {}
 			});
 		});
+		var promise = BetaJS.Promise.create(); 
 		f.once('error', function(err) {
-			BetaJS.SyncAsync.callback(callbacks, "exception", err);
+			promise.asyncError(err);
 		});
 		f.once('end', function() {
-			BetaJS.SyncAsync.callback(callbacks, "success", mails);
+			promise.asyncSuccess(mails);
 		});			
+		return promise;
 	},
 	
 	__parse: function (header, body, attrs) {
@@ -372,7 +373,7 @@ BetaJS.Class.extend("BetaJS.Server.Net.Imap", [
 }]);
 BetaJS.Server.Net.Smtp = {
 	
-	send: function (config, message, callbacks) {
+	send: function (config, message) {
 		var email = require("emailjs");
 		message.from = BetaJS.Strings.email_get_email(message.from);
 		message.to = BetaJS.Strings.email_get_email(message.to);
@@ -380,12 +381,9 @@ BetaJS.Server.Net.Smtp = {
 			message.text = message.text_body;
 			delete message.text_body;
 		}
- 		email.server.connect(config).send(email.message.create(message), function (err, msg) {
-			if (err)
-				BetaJS.SyncAsync.callback(callbacks, "exception", err);
-			else
-				BetaJS.SyncAsync.callback(callbacks, "success", msg);
- 		});
+		var promise = BetaJS.Promise.create();
+ 		email.server.connect(config).send(email.message.create(message), promise.asyncCallbackFunc());
+ 		return promise;
 	}
 	
 };
@@ -435,32 +433,26 @@ BetaJS.Class.extend("BetaJS.Server.Sessions.Manager", [
     	this.__sessions.iterate(cb, ctx || this);
     },
 
-    obtain_session: function (token, options, callbacks) {
-    	this.find_session(token, {
-    		context: this,
-    		success: function (session) {
-    			BetaJS.SyncAsync.callback(callbacks, "success", session || this.new_session(token, options));
-    		}
-    	});
+    obtain_session: function (token, options) {
+    	return this.find_session(token).mapSuccess(function (session) {
+    		return session || this.new_session(token, options);
+    	}, this);
     },
     
     __generate_token: function () {
     	return BetaJS.Tokens.generate_token();
     },
     
-    __lookup_session: function (token, callbacks) {
-    	this._helper({
+    __lookup_session: function (token) {
+    	return this._helper({
     		method: "__lookup_session",
-    		callbacks: callbacks
-    	}, token, callbacks);
+    		async: true
+    	}, token);
     },
     
-    find_session: function (token, callbacks) {
+    find_session: function (token) {
     	var session = this.__sessions.get(token);
-    	if (session)
-    		BetaJS.SyncAsync.callback(callbacks, "success", session);
-    	else
-    		this.__lookup_session(token, callbacks);
+    	return session ? BetaJS.Promise.create(session) : this.__lookup_session(token);
     },
     
     __add_session: function (session) {
@@ -469,7 +461,7 @@ BetaJS.Class.extend("BetaJS.Server.Sessions.Manager", [
     },
     
     new_session: function (token, options) {
-        session = new this._session_class(this, token || this.__generate_token(), options);
+        var session = new this._session_class(this, token || this.__generate_token(), options);
         this.__add_session(session);
         return session;
     },
@@ -505,7 +497,7 @@ BetaJS.Class.extend("BetaJS.Server.Sessions.Session", [
     constructor: function (manager, token, options) {
         this._inherited(BetaJS.Server.Sessions.Session, "constructor");
         this.__manager = manager;
-        this.__options = options;
+        this.__options = options || {};
         BetaJS.Ids.objectId(this, token);
         this.initiation_time = BetaJS.Time.now();
         this.active_time = this.initiation_time;
@@ -766,31 +758,20 @@ BetaJS.Class.extend("BetaJS.Server.Session.PersistentSessionManagerHelper", {
         manager.store = this.__store;
 	},
 	
-	__lookup_session: function (token, callbacks) {
-		this.__table.findBy({token: token}, {
-			context: this,
-			success: function (model) {
-				if (model) {
-					var session = this.__manager.new_session(token, {
-						model: model
-					});
-					BetaJS.SyncAsync.callback(callbacks, "success", session);
-				} else
-					BetaJS.SyncAsync.callback(callbacks, "success", null);
-			}, failure: function () {
-				BetaJS.SyncAsync.callback(callbacks, "success", null);
-			}
-		});
+	__lookup_session: function (token) {
+		return this.__table.findBy({token: token}).mapCallback(function (err, model) {
+			return model && !err ? this.__manager.new_session(token, { model: model }) : null;
+		}, this);
 	},
 	
 	__add_session: function (session) {
 		var session_options = session.options();
 		if (!session_options.model) {
-			session_options.model = new this._persistent_session_model({
+			session_options.model = this.__table.newModel({
 				token: session.cid(),
 				created: BetaJS.Time.now()
 			});
-			session_options.model.save({});
+			session_options.model.save();
 		}
 		session.model = session_options.model;
 		session.model.session = session;
@@ -803,17 +784,14 @@ BetaJS.Class.extend("BetaJS.Server.Session.PersistentSessionManagerHelper", {
     invalidate: function () {
     	if (this.__options.invalidation.session_timeout) {
     		var time = BetaJS.Time.now() - this.__options.invalidation.session_timeout;
-    		this.__table.allBy({"created" : {"$lt": time}}, {}, {
-    			context: this,
-    			success: function (iter) {
-    				while (iter.hasNext()) {
-    					var model = iter.next();
-    					if (model.session)
-    						this.__manager.delete_session(model.session);
-    					model.remove();
-    				}
-    			}
-    		});
+    		this.__table.allBy({"created" : {"$lt": time}}).success(function (iter) {
+				while (iter.hasNext()) {
+					var model = iter.next();
+					if (model.session)
+						this.__manager.delete_session(model.session);
+					model.remove();
+				}
+    		}, this);
     	}
     }
 	
@@ -888,21 +866,18 @@ BetaJS.Class.extend("BetaJS.Server.Session.SocketsManagerHelper", {
 		this.__manager = manager;
 		manager.bind_socket = function (socket, session_cookie, data) {
 			var session_token = BetaJS.Strings.read_cookie_string(socket.handshake.headers.cookie, session_cookie, data);
-	        this.find_session(session_token, {
-	        	context: this,
-	        	success: function (session) {
-			        if (!session) {
-			            socket.disconnect();
-			            return;
-			        }
-			        var active_session = session.active_sessions.find_active_session(data.active_session_token);
-			        if (!active_session) {
-			            socket.disconnect();
-			            return;
-			        }
-			        active_session.socket.bind(socket);        
-	        	}
-	        });
+	        this.find_session(session_token).success(function (session) {
+		        if (!session) {
+		            socket.disconnect();
+		            return;
+		        }
+		        var active_session = session.active_sessions.find_active_session(data.active_session_token);
+		        if (!active_session) {
+		            socket.disconnect();
+		            return;
+		        }
+		        active_session.socket.bind(socket);        
+	        }, this);
 		};
 	},
 
@@ -953,8 +928,7 @@ BetaJS.Class.extend("BetaJS.Server.Session.SocketsHelper", {
       
 });
 
-BetaJS.Class.extend("BetaJS.Databases.Database", [
-	BetaJS.SyncAsync.SyncAsyncMixin, {
+BetaJS.Class.extend("BetaJS.Databases.Database", {
 	
 	_tableClass: function () {
 		return null;
@@ -965,36 +939,27 @@ BetaJS.Class.extend("BetaJS.Databases.Database", [
 		return new cls(this, table_name);
 	}
 		
-}]);
+});
 
-BetaJS.Class.extend("BetaJS.Databases.DatabaseTable", [
-	BetaJS.SyncAsync.SyncAsyncMixin, {
+BetaJS.Class.extend("BetaJS.Databases.DatabaseTable", {
 	
 	constructor: function (database, table_name) {
 		this._inherited(BetaJS.Databases.DatabaseTable, "constructor");
 		this._database = database;
 		this._table_name = table_name;
 	},
-	
-	supportsSync: function () {
-		return this._database.supportsSync();
+
+	findOne: function (query, options) {
+		return this._findOne(this._encode(query), options).mapSuccess(function (result) {
+			return !result ? null : this._decode(result);
+		}, this);
 	},
 	
-	supportsAsync: function () {
-		return this._database.supportsAsync();
-	},
-	
-	findOne: function (query, options, callbacks) {
-		return this.then(this._findOne, [this._encode(query), options], callbacks, function (result, callbacks) {
-			BetaJS.SyncAsync.callback(callbacks, "success", !result ? null : this._decode(result));
-		});
-	},
-	
-	_findOne: function (query, options, callbacks) {
+	_findOne: function (query, options) {
 		options = options || {};
 		options.limit = 1;
-		return this.then(this._find, [query, options], callbacks, function (result, callbacks) {
-			BetaJS.SyncAsync.callback(callbacks, "success", result.next());
+		return this._find(query, options).mapSuccess(function (result) {
+			return result.next();
 		});
 	},
 	
@@ -1006,58 +971,54 @@ BetaJS.Class.extend("BetaJS.Databases.DatabaseTable", [
 		return data;
 	},
 
-	_find: function (query, options, callbacks) {
+	_find: function (query, options) {
 	},
 
-	find: function (query, options, callbacks) {
-		return this.then(this._find, [this._encode(query), options], callbacks, function (result, callbacks) {
-			BetaJS.SyncAsync.callback(callbacks, "success", new BetaJS.Iterators.MappedIterator(result, this._decode, this)); 
-		});
+	find: function (query, options) {
+		return this._find(this._encode(query), options).mapSuccess(function (result) {
+			return new BetaJS.Iterators.MappedIterator(result, this._decode, this);
+		}, this);
 	},
 	
-	findById: function (id, callbacks) {
-		return this.findOne({id : id}, {}, callbacks);
+	findById: function (id) {
+		return this.findOne({id : id});
 	},
 	
-	_insertRow: function (row, callbacks) {		
+	_insertRow: function (row) {		
 	},
 	
-	_removeRow: function (query, callbacks) {		
+	_removeRow: function (query) {		
 	},
 	
-	_updateRow: function (query, row, callbacks) {
+	_updateRow: function (query, row) {
 	},
 	
-	insertRow: function (row, callbacks) {
-		return this.then(this._insertRow, [this._encode(row)], callbacks, function (result, callbacks) {
-			BetaJS.SyncAsync.callback(callbacks, "success", this._decode(result));
-		});
+	insertRow: function (row) {
+		return this._insertRow(this._encode(row)).mapSuccess(this._decode, this);
 	},
 	
-	removeRow: function (query, callbacks) {
-		return this._removeRow(this._encode(query), callbacks);
+	removeRow: function (query) {
+		return this._removeRow(this._encode(query));
 	},
 	
-	updateRow: function (query, row, callbacks) {
-		return this.then(this._updateRow, [this._encode(query), this._encode(row)], callbacks, function (result, callbacks) {
-			BetaJS.SyncAsync.callback(callbacks, "success", this._decode(result));
-		});
+	updateRow: function (query, row) {
+		return this._updateRow(this._encode(query), this._encode(row)).mapSuccess(this._decode, this);
 	},
 	
-	removeById: function (id, callbacks) {
-		return this.removeRow({id : id}, callbacks);
+	removeById: function (id) {
+		return this.removeRow({id : id});
 	},
 	
-	updateById: function (id, data, callbacks) {
-		return this.updateRow({id: id}, data, callbacks);
+	updateById: function (id, data) {
+		return this.updateRow({id: id}, data);
 	},
 	
 	ensureIndex: function (key) {}
 	
-}]);
+});
 BetaJS.Databases.Database.extend("BetaJS.Databases.MongoDatabase", {
 
-    constructor : function(db, options) {
+    constructor : function(db) {
         if (BetaJS.Types.is_string(db)) {
             this.__dbUri = BetaJS.Strings.strip_start(db, "mongodb://");
             this.__dbObject = this.cls.uriToObject(db);
@@ -1071,58 +1032,32 @@ BetaJS.Databases.Database.extend("BetaJS.Databases.MongoDatabase", {
             this.__dbUri = this.cls.objectToUri(db);
         }
         this._inherited(BetaJS.Databases.MongoDatabase, "constructor");
-        options = options || {};
-        this._supportsAsync = "async" in options ? options.async : false;
-        this._supportsSync = "sync" in options ? options.sync : !this.__supportsAsync;
+        this.mongo_module = require("mongodb");
     },
 
     _tableClass : function() {
         return BetaJS.Databases.MongoDatabaseTable;
     },
 
-    mongo_module_sync : function() {
-        if (!this.__mongo_module_sync)
-            this.__mongo_module_sync = require("mongo-sync");
-        return this.__mongo_module_sync;
-    },
-
-    mongo_module_async : function() {
-        if (!this.__mongo_module_async)
-            this.__mongo_module_async = require("mongodb");
-        return this.__mongo_module_async;
-    },
-
     mongo_object_id : function(id) {
-        return this.supportsSync() ? this.mongo_module_sync().ObjectId : this.mongo_module_async().BSONNative.ObjectID;
+        return this.mongo_module.BSONNative.ObjectID;
     },
 
-    mongodb_sync : function(callbacks) {
-        return this.eitherSyncFactory("__mongodb_sync", callbacks, function() {
-            var mod = this.mongo_module_sync();
-            this.__mongo_server_sync = new mod.Server(this.__dbObject.server + ":" + this.__dbObject.port);
-            var db = this.__mongo_server_sync.db(this.__dbObject.database);
-            if (this.__dbObject.username)
-                db.auth(this.__dbObject.username, this.__dbObject.password);
-            return db;
-        });
-    },
-
-    mongodb_async : function(callbacks) {
-        return this.eitherAsyncFactory("__mongodb_async", callbacks, function(callbacks) {
-            var MongoClient = this.mongo_module_async().MongoClient;
-            MongoClient.connect('mongodb://' + this.__dbUri, {
-                server: {
-                    'auto_reconnect': true
-                }
-            }, BetaJS.SyncAsync.toCallbackType(callbacks, BetaJS.SyncAsync.ASYNCSINGLE));
-        });
+    mongodb : function() {
+    	if (this.__mongodb)
+    		return BetaJS.Promise.value(this.__mongodb);
+    	var promise = BetaJS.Promise.create();
+        this.mongo_module.MongoClient.connect('mongodb://' + this.__dbUri, {
+            server: {
+                'auto_reconnect': true
+            }
+        }, promise.asyncCallbackFunc());
+        return promise.success(function (db) {
+        	this.__mongodb = db;
+        }, this);
     },
 
     destroy : function() {
-        if (this.__mongo_server_sync)
-            this.__mongo_server_sync.close();
-        if (this.__mongo_server_async)
-            this.__mongo_server_async.close();
         this._inherited(BetaJS.Databases.MongoDatabase, "destroy");
     }
 }, {
@@ -1145,27 +1080,13 @@ BetaJS.Databases.Database.extend("BetaJS.Databases.MongoDatabase", {
 }); 
 BetaJS.Databases.DatabaseTable.extend("BetaJS.Databases.MongoDatabaseTable", {
 	
-	constructor: function (database, table_name) {
-		this._inherited(BetaJS.Databases.MongoDatabaseTable, "constructor", database, table_name);
-	},
-	
-	table_sync: function (callbacks) {
-		return this.eitherSyncFactory("__table_sync", callbacks, function () {
-			return this._database.mongodb_sync().getCollection(this._table_name);
-		});		
-	},
-	
-	table_async: function (callbacks) {
-		var self = this;
-		return this.eitherAsyncFactory("__table_async", callbacks, function () {
-			this._database.mongodb_async(BetaJS.SyncAsync.mapSuccess(callbacks, function (db) {
-				BetaJS.SyncAsync.callback(callbacks, "success", db.collection(self._table_name));
-			}));
-		});
-	},
-	
-	table: function (callbacks) {
-		return this.either(callbacks, this.table_sync, this.table_async);
+	table: function () {
+		if (this.__table)
+			return BetaJS.Promise.create(this.__table);
+		return this._database.mongodb().mapSuccess(function (db) {
+			this.__table = db.collection(this._table_name);
+			return this.__table;
+		}, this);
 	},
 	
 	_encode: function (data) {
@@ -1187,9 +1108,9 @@ BetaJS.Databases.DatabaseTable.extend("BetaJS.Databases.MongoDatabaseTable", {
 		return obj;
 	},
 
-	_find: function (query, options, callbacks) {
-		return this.then(this.table, callbacks, function (table, callbacks) {
-			this.thenSingle(table, table.find, [query], callbacks, function (result, callbacks) {
+	_find: function (query, options) {
+		return this.table().mapSuccess(function (table) {
+			return BetaJS.Promise.funcCallback(table, table.find, query).mapSuccess(function (result) {
 				options = options || {};
 				if ("sort" in options)
 					result = result.sort(options.sort);
@@ -1197,43 +1118,42 @@ BetaJS.Databases.DatabaseTable.extend("BetaJS.Databases.MongoDatabaseTable", {
 					result = result.skip(options.skip);
 				if ("limit" in options)
 					result = result.limit(options.limit);
-				this.thenSingle(result, result.toArray, callbacks, function (cols, callbacks) {
-					BetaJS.SyncAsync.callback(callbacks, "success", new BetaJS.Iterators.ArrayIterator(cols));
-				});
-			});
-		});
+				return BetaJS.Promise.funcCallback(result, result.toArray).mapSuccess(function (cols) {
+					return new BetaJS.Iterators.ArrayIterator(cols);
+				}, this);
+			}, this);
+		}, this);
 	},
 
-	_insertRow: function (row, callbacks) {
-		return this.then(this.table, callbacks, function (table, callbacks) {
-			this.thenSingle(table, table.insert, [row], callbacks, function (result, callbacks) {
-				BetaJS.SyncAsync.callback(callbacks, "success", result[0] ? result[0] : result);
-			});
-		});
+	_insertRow: function (row) {
+		console.log("Go", row);
+		return this.table().mapSuccess(function (table) {
+			return BetaJS.Promise.funcCallback(table, table.insert, row).mapSuccess(function (result) {
+				return result[0] ? result[0] : result;
+			}, this);
+		}, this);
 	},
 	
 	_removeRow: function (query, callbacks) {
-		return this.then(this.table, callbacks, function (table, callbacks) {
-			this.thenSingle(table, table.remove, [query], callbacks);
-		});
+		return this.table().mapSuccess(function (table) {
+			return BetaJS.Promise.funcCallback(table, table.remove, query); 
+		}, this);
 	},
 	
 	_updateRow: function (query, row, callbacks) {
-		return this.then(this.table, callbacks, function (table, callbacks) {
-			this.thenSingle(table, table.update, [query, {"$set" : row}], callbacks, function (result, callbacks) {
-				BetaJS.SyncAsync.callback(callbacks, "success", row);
-			});
-		});
+		console.log("Flow", query, row);
+		return this.table().mapSuccess(function (table) {
+			return BetaJS.Promise.funcCallback(table, table.update, query, {"$set" : row}).mapSuccess(function () {
+				return row;
+			}); 
+		}, this);
 	},
 		
 	ensureIndex: function (key) {
 		var obj = {};
 		obj[key] = 1;
-		this.table({
-			success: function (table) {
-				table.ensureIndex(obj, function () {
-				});
-			}
+		this.table().success(function (table) {
+			table.ensureIndex(BetaJS.Objs.objectBy(key, 1));
 		});
 	}	
 
@@ -1255,45 +1175,30 @@ BetaJS.Stores.BaseStore.extend("BetaJS.Stores.DatabaseStore", {
 		return this.__table;
 	},
 	
-	_insert: function (data, callbacks) {
+	_insert: function (data) {
 	    if (!this.__foreign_id || !data[this.__foreign_id])
-	        return this.table().insertRow(data, callbacks);
-        var query = {};
-        query[this.__foreign_id] = data[this.__foreign_id];
-	    return this.table().findOne(query, {}, {
-	        context: this,
-	        success: function (result) {
-	            if (result)
-	                return BetaJS.SyncAsync.callback(callbacks, "success", result);
-                return this.table().insertRow(data, callbacks);
-	        }, exception: function (e) {
-	            BetaJS.SyncAsync.callback(callbacks, "exception", e);    
-	        }
-	    });
+	        return this.table().insertRow(data);
+	    return this.table().findOne(BetaJS.Objs.objectBy(this.__foreign_id, data[this.__foreign_id])).mapSuccess(function (result) {
+	    	return result ? result : this.table().insertRow(data);
+	    }, this);
 	},
 	
-	_remove: function (id, callbacks) {
+	_remove: function (id) {
 	    if (!this.__foreign_id)
-		    return this.table().removeById(id, callbacks);
-		var query = {};
-		query[this.__foreign_id] = id;
-		return this.table().removeRow(query, callbacks);
+		    return this.table().removeById(id);
+		return this.table().removeRow(BetaJS.Objs.objectBy(this.__foreign_id, id));
 	},
 	
-	_get: function (id, callbacks) {
+	_get: function (id) {
         if (!this.__foreign_id)
-    		return this.table().findById(id, callbacks);
-        var query = {};
-        query[this.__foreign_id] = id;
-	    return this.table().findOne(query, {}, callbacks);
+    		return this.table().findById(id);
+	    return this.table().findOne(BetaJS.Objs.objectBy(this.__foreign_id, id));
 	},
 	
-	_update: function (id, data, callbacks) {
+	_update: function (id, data) {
         if (!this.__foreign_id)
-    		return this.table().updateById(id, data, callbacks);
-        var query = {};
-        query[this.__foreign_id] = id;
-        return this.updateRow(query, data, callbacks);
+    		return this.table().updateById(id, data);
+        return this.updateRow(BetaJS.Objs.objectBy(this.__foreign_id, id), data);
 	},
 	
 	_query_capabilities: function () {
@@ -1305,8 +1210,8 @@ BetaJS.Stores.BaseStore.extend("BetaJS.Stores.DatabaseStore", {
 		};
 	},
 	
-	_query: function (query, options, callbacks) {
-		return this.table().find(query, options, callbacks);
+	_query: function (query, options) {
+		return this.table().find(query, options);
 	},
 	
 	_ensure_index: function (key) {
@@ -1456,25 +1361,15 @@ BetaJS.Stores.BaseStore.extend("BetaJS.Stores.ImapStore", {
 	
 	constructor: function (options) {
 		this._inherited(BetaJS.Stores.ImapStore, "constructor", options);
-		this._supportSync = false;
 		this.__imap = BetaJS.Objs.extend(BetaJS.Objs.clone(options.base, 1), options.imap);
 		this.__smtp = BetaJS.Objs.extend(BetaJS.Objs.clone(options.base, 1), options.smtp);
 		this.__imap_opts = options.imap_options || {};
 		this.__imap_opts.reconnect_on_error = false;
 	},
 	
-	test: function (callbacks) {
+	test: function () {
 		var imap = new BetaJS.Server.Net.Imap(this.__imap, this.__imap_opts);
-		imap.connect({
-			success: function () {
-				imap.destroy();
-				BetaJS.SyncAsync.callback(callbacks, "success");
-			},
-			exception: function () {
-				imap.destroy();
-				BetaJS.SyncAsync.callback(callbacks, "exception");
-			}
-		});
+		return imap.connect().callback(imap.destroy, imap);
 	},
 	
 	_query_capabilities: function () {
@@ -1484,40 +1379,33 @@ BetaJS.Stores.BaseStore.extend("BetaJS.Stores.ImapStore", {
 		};
 	},
 
-	_query: function (query, options, callbacks) {
+	_query: function (query, options) {
 		var self = this;
 		var imap = new BetaJS.Server.Net.Imap(this.__imap, this.__imap_opts);
-		imap.connect(BetaJS.SyncAsync.mapSuccess(callbacks, function () {
+		return imap.connect().mapSuccess(function () {
 			var opts = {};
 			if ("skip" in options)
 				opts.seq_start = options.skip + 1;
 			if ("limit" in options)
 				opts.seq_count = options.limit;
 			opts.reverse = true;
-			imap.fetch(opts, BetaJS.SyncAsync.mapSuccess(callbacks, function (mails) {
-				self.callback(callbacks, "success", BetaJS.Objs.map(mails, function (mail) {
-					return mail;
-				}));
+			return imap.fetch(opts).success(function (mails) {
 				imap.destroy();
-			}));
-		}));
+			}, this);
+		}, this);
 	},
 	
-	_insert: function (mail, callbacks) {
+	_insert: function (mail) {
 		BetaJS.Server.Net.Smtp.send(this.__smtp, {
  			from: mail.from,
  			to: mail.to,
  			subject: mail.subject,
 			text_body: mail.text_body
-		}, {
-			context: callbacks.context,
-			success: function (msg) {
-				mail.id = msg.header["message-id"];
-				BetaJS.SyncAsync.callback(callbacks, "success", mail);
-			},
-			exception: function (err) {
-				BetaJS.SyncAsync.callback(callbacks, "exception", new BetaJS.Stores.StoreException(err));
-			}
+		}).mapCallback(function (err, msg) {
+			if (err)
+				return new BetaJS.Stores.StoreException(err);
+			mail.id = msg.header["message-id"];
+			return mail;
 		});
 	}
 	
@@ -1532,14 +1420,11 @@ BetaJS.Stores.ListenerStore.extend("BetaJS.Stores.ImapListenerStore", {
 		var imap = new BetaJS.Server.Net.Imap(opts, {reonnect_on_error: true});
 		this._auto_destroy(imap);
 		imap.on("new_mail", function (count) {
-			imap.fetch({seq_count: count, reverse: true}, {
-				context: this,
-				success: function (mails) {
-					BetaJS.Objs.iter(mails, function (mail) {
-						this._inserted(mail);
-					}, this);
-				}
-			});
+			imap.fetch({seq_count: count, reverse: true}).success(function (mails) {
+				BetaJS.Objs.iter(mails, function (mail) {
+					this._inserted(mail);
+				}, this);
+			}, this);
 		}, this);
 		imap.connect();
 	}

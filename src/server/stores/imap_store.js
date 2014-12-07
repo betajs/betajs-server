@@ -2,25 +2,15 @@ BetaJS.Stores.BaseStore.extend("BetaJS.Stores.ImapStore", {
 	
 	constructor: function (options) {
 		this._inherited(BetaJS.Stores.ImapStore, "constructor", options);
-		this._supportSync = false;
 		this.__imap = BetaJS.Objs.extend(BetaJS.Objs.clone(options.base, 1), options.imap);
 		this.__smtp = BetaJS.Objs.extend(BetaJS.Objs.clone(options.base, 1), options.smtp);
 		this.__imap_opts = options.imap_options || {};
 		this.__imap_opts.reconnect_on_error = false;
 	},
 	
-	test: function (callbacks) {
+	test: function () {
 		var imap = new BetaJS.Server.Net.Imap(this.__imap, this.__imap_opts);
-		imap.connect({
-			success: function () {
-				imap.destroy();
-				BetaJS.SyncAsync.callback(callbacks, "success");
-			},
-			exception: function () {
-				imap.destroy();
-				BetaJS.SyncAsync.callback(callbacks, "exception");
-			}
-		});
+		return imap.connect().callback(imap.destroy, imap);
 	},
 	
 	_query_capabilities: function () {
@@ -30,40 +20,33 @@ BetaJS.Stores.BaseStore.extend("BetaJS.Stores.ImapStore", {
 		};
 	},
 
-	_query: function (query, options, callbacks) {
+	_query: function (query, options) {
 		var self = this;
 		var imap = new BetaJS.Server.Net.Imap(this.__imap, this.__imap_opts);
-		imap.connect(BetaJS.SyncAsync.mapSuccess(callbacks, function () {
+		return imap.connect().mapSuccess(function () {
 			var opts = {};
 			if ("skip" in options)
 				opts.seq_start = options.skip + 1;
 			if ("limit" in options)
 				opts.seq_count = options.limit;
 			opts.reverse = true;
-			imap.fetch(opts, BetaJS.SyncAsync.mapSuccess(callbacks, function (mails) {
-				self.callback(callbacks, "success", BetaJS.Objs.map(mails, function (mail) {
-					return mail;
-				}));
+			return imap.fetch(opts).success(function (mails) {
 				imap.destroy();
-			}));
-		}));
+			}, this);
+		}, this);
 	},
 	
-	_insert: function (mail, callbacks) {
+	_insert: function (mail) {
 		BetaJS.Server.Net.Smtp.send(this.__smtp, {
  			from: mail.from,
  			to: mail.to,
  			subject: mail.subject,
 			text_body: mail.text_body
-		}, {
-			context: callbacks.context,
-			success: function (msg) {
-				mail.id = msg.header["message-id"];
-				BetaJS.SyncAsync.callback(callbacks, "success", mail);
-			},
-			exception: function (err) {
-				BetaJS.SyncAsync.callback(callbacks, "exception", new BetaJS.Stores.StoreException(err));
-			}
+		}).mapCallback(function (err, msg) {
+			if (err)
+				return new BetaJS.Stores.StoreException(err);
+			mail.id = msg.header["message-id"];
+			return mail;
 		});
 	}
 	
@@ -78,14 +61,11 @@ BetaJS.Stores.ListenerStore.extend("BetaJS.Stores.ImapListenerStore", {
 		var imap = new BetaJS.Server.Net.Imap(opts, {reonnect_on_error: true});
 		this._auto_destroy(imap);
 		imap.on("new_mail", function (count) {
-			imap.fetch({seq_count: count, reverse: true}, {
-				context: this,
-				success: function (mails) {
-					BetaJS.Objs.iter(mails, function (mail) {
-						this._inserted(mail);
-					}, this);
-				}
-			});
+			imap.fetch({seq_count: count, reverse: true}).success(function (mails) {
+				BetaJS.Objs.iter(mails, function (mail) {
+					this._inserted(mail);
+				}, this);
+			}, this);
 		}, this);
 		imap.connect();
 	}

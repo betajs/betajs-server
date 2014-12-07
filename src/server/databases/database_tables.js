@@ -1,31 +1,22 @@
-BetaJS.Class.extend("BetaJS.Databases.DatabaseTable", [
-	BetaJS.SyncAsync.SyncAsyncMixin, {
+BetaJS.Class.extend("BetaJS.Databases.DatabaseTable", {
 	
 	constructor: function (database, table_name) {
 		this._inherited(BetaJS.Databases.DatabaseTable, "constructor");
 		this._database = database;
 		this._table_name = table_name;
 	},
-	
-	supportsSync: function () {
-		return this._database.supportsSync();
+
+	findOne: function (query, options) {
+		return this._findOne(this._encode(query), options).mapSuccess(function (result) {
+			return !result ? null : this._decode(result);
+		}, this);
 	},
 	
-	supportsAsync: function () {
-		return this._database.supportsAsync();
-	},
-	
-	findOne: function (query, options, callbacks) {
-		return this.then(this._findOne, [this._encode(query), options], callbacks, function (result, callbacks) {
-			BetaJS.SyncAsync.callback(callbacks, "success", !result ? null : this._decode(result));
-		});
-	},
-	
-	_findOne: function (query, options, callbacks) {
+	_findOne: function (query, options) {
 		options = options || {};
 		options.limit = 1;
-		return this.then(this._find, [query, options], callbacks, function (result, callbacks) {
-			BetaJS.SyncAsync.callback(callbacks, "success", result.next());
+		return this._find(query, options).mapSuccess(function (result) {
+			return result.next();
 		});
 	},
 	
@@ -37,52 +28,48 @@ BetaJS.Class.extend("BetaJS.Databases.DatabaseTable", [
 		return data;
 	},
 
-	_find: function (query, options, callbacks) {
+	_find: function (query, options) {
 	},
 
-	find: function (query, options, callbacks) {
-		return this.then(this._find, [this._encode(query), options], callbacks, function (result, callbacks) {
-			BetaJS.SyncAsync.callback(callbacks, "success", new BetaJS.Iterators.MappedIterator(result, this._decode, this)); 
-		});
+	find: function (query, options) {
+		return this._find(this._encode(query), options).mapSuccess(function (result) {
+			return new BetaJS.Iterators.MappedIterator(result, this._decode, this);
+		}, this);
 	},
 	
-	findById: function (id, callbacks) {
-		return this.findOne({id : id}, {}, callbacks);
+	findById: function (id) {
+		return this.findOne({id : id});
 	},
 	
-	_insertRow: function (row, callbacks) {		
+	_insertRow: function (row) {		
 	},
 	
-	_removeRow: function (query, callbacks) {		
+	_removeRow: function (query) {		
 	},
 	
-	_updateRow: function (query, row, callbacks) {
+	_updateRow: function (query, row) {
 	},
 	
-	insertRow: function (row, callbacks) {
-		return this.then(this._insertRow, [this._encode(row)], callbacks, function (result, callbacks) {
-			BetaJS.SyncAsync.callback(callbacks, "success", this._decode(result));
-		});
+	insertRow: function (row) {
+		return this._insertRow(this._encode(row)).mapSuccess(this._decode, this);
 	},
 	
-	removeRow: function (query, callbacks) {
-		return this._removeRow(this._encode(query), callbacks);
+	removeRow: function (query) {
+		return this._removeRow(this._encode(query));
 	},
 	
-	updateRow: function (query, row, callbacks) {
-		return this.then(this._updateRow, [this._encode(query), this._encode(row)], callbacks, function (result, callbacks) {
-			BetaJS.SyncAsync.callback(callbacks, "success", this._decode(result));
-		});
+	updateRow: function (query, row) {
+		return this._updateRow(this._encode(query), this._encode(row)).mapSuccess(this._decode, this);
 	},
 	
-	removeById: function (id, callbacks) {
-		return this.removeRow({id : id}, callbacks);
+	removeById: function (id) {
+		return this.removeRow({id : id});
 	},
 	
-	updateById: function (id, data, callbacks) {
-		return this.updateRow({id: id}, data, callbacks);
+	updateById: function (id, data) {
+		return this.updateRow({id: id}, data);
 	},
 	
 	ensureIndex: function (key) {}
 	
-}]);
+});
