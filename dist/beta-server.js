@@ -1,5 +1,5 @@
 /*!
-betajs-server - v1.0.0 - 2014-12-06
+betajs-server - v1.0.0 - 2014-12-07
 Copyright (c) Oliver Friedmann
 MIT Software License.
 */
@@ -1126,7 +1126,6 @@ BetaJS.Databases.DatabaseTable.extend("BetaJS.Databases.MongoDatabaseTable", {
 	},
 
 	_insertRow: function (row) {
-		console.log("Go", row);
 		return this.table().mapSuccess(function (table) {
 			return BetaJS.Promise.funcCallback(table, table.insert, row).mapSuccess(function (result) {
 				return result[0] ? result[0] : result;
@@ -1141,7 +1140,6 @@ BetaJS.Databases.DatabaseTable.extend("BetaJS.Databases.MongoDatabaseTable", {
 	},
 	
 	_updateRow: function (query, row, callbacks) {
-		console.log("Flow", query, row);
 		return this.table().mapSuccess(function (table) {
 			return BetaJS.Promise.funcCallback(table, table.update, query, {"$set" : row}).mapSuccess(function () {
 				return row;
