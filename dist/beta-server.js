@@ -1094,7 +1094,7 @@ BetaJS.Databases.DatabaseTable.extend("BetaJS.Databases.MongoDatabaseTable", {
 		if ("id" in data) {
 			delete obj["id"];
             var objid = this._database.mongo_object_id();
-            obj._id = new objid(data.id);
+            obj._id = new objid(data.id + "");
 		}
 		return obj;
 	},
@@ -1231,7 +1231,7 @@ BetaJS.Stores.ConversionStore.extend("BetaJS.Stores.MongoDatabaseStore", {
 		for (var key in types) {
 			if (types[key] == "id") {
 				encoding[key] = function (value) {
-					return value ? new ObjectId(value) : null;
+					return value ? new ObjectId(value + "") : null;
 				};
 				decoding[key] = function (value) {
 					return value ? value + "" : null;
