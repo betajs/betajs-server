@@ -25,7 +25,7 @@ BetaJS.Class.extend("BetaJS.Server.Net.Imap", [
 		this.__imap.on("error", function () {
 			self.trigger("error");
 			if (options.reconnect_on_error)
-				BetaJS.SyncAsync.eventually(self.reconnect, [], self);
+				BetaJS.Async.eventually(self.reconnect, [], self);
 		});
 	},
 	

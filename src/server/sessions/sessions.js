@@ -62,6 +62,8 @@ BetaJS.Class.extend("BetaJS.Server.Sessions.Manager", [
     },
     
     find_session: function (token) {
+    	if (!token)
+    		return BetaJS.Promise.value(null);
     	var session = this.__sessions.get(token);
     	return session ? BetaJS.Promise.create(session) : this.__lookup_session(token);
     },

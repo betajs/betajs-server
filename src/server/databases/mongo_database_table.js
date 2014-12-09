@@ -13,8 +13,10 @@ BetaJS.Databases.DatabaseTable.extend("BetaJS.Databases.MongoDatabaseTable", {
 		var obj = BetaJS.Objs.clone(data, 1);
 		if ("id" in data) {
 			delete obj["id"];
-            var objid = this._database.mongo_object_id();
-            obj._id = new objid(data.id + "");
+			if (data.id !== null) {
+	            var objid = this._database.mongo_object_id();
+	            obj._id = new objid(data.id + "");
+			}
 		}
 		return obj;
 	},

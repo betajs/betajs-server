@@ -1,5 +1,5 @@
 /*!
-betajs-data - v1.0.0 - 2014-12-06
+betajs-data - v1.0.0 - 2014-12-09
 Copyright (c) Oliver Friedmann
 MIT Software License.
 */
@@ -783,6 +783,7 @@ BetaJS.Stores.BaseStore = BetaJS.Stores.ListenerStore.extend("BetaJS.Stores.Base
 	},
 	
 	query: function (query, options) {
+		query = BetaJS.Objs.clone(query, -1);
 		if (options) {
 			if (options.limit)
 				options.limit = parseInt(options.limit, 10);
@@ -1453,7 +1454,7 @@ BetaJS.Stores.DualStore.extend("BetaJS.Stores.CachedStore", {
 	           var s = BetaJS.Queries.Constrained.serialize(subsumizer);
 	           if (!this.__queries[s]) {
 	               this.__queries[s] = true;
-	               BetaJS.SyncAsync.eventually(function () {
+	               BetaJS.Async.eventually(function () {
 	                   this.invalidate_query(subsumizer, true);	                   
 	               }, [], this);
 	           }
@@ -1718,9 +1719,7 @@ BetaJS.Stores.BaseStore.extend("BetaJS.Stores.RemoteStore", {
 		this.__ajax = ajax;
 		this.__options = BetaJS.Objs.extend({
 			"update_method": "PUT",
-			"uri_mappings": {},
-			"bulk_method": "POST",
-			"supports_bulk": false
+			"uri_mappings": {}
 		}, options || {});
 	},
 	
@@ -2035,8 +2034,8 @@ BetaJS.Properties.Properties.extend("BetaJS.Modelling.SchemedProperties", {
 		if (!(key in scheme))
 			return value;
 		var sch = scheme[key];
-		if (sch.type == "boolean")
-			return BetaJS.Types.parseBool(value);
+		if (sch.type)
+			value = BetaJS.Types.parseType(value, sch.type);
 		if (sch.transform)
 			value = sch.transform.apply(this, [value]);
 		return value;
@@ -2210,7 +2209,7 @@ BetaJS.Properties.Properties.extend("BetaJS.Modelling.SchemedProperties", {
 		var result = {};
 		var scheme = this.scheme();
 		for (var key in obj) {
-			if (!BetaJS.Types.is_defined(scheme[key].persistent) || scheme[key].persistent)
+			if ((!BetaJS.Types.is_defined(scheme[key].persistent) || scheme[key].persistent) && (BetaJS.Types.is_defined(obj[key])))
 				result[key] = obj[key];
 		}
 		return result;
@@ -2269,7 +2268,8 @@ BetaJS.Modelling.SchemedProperties.extend("BetaJS.Modelling.AssociatedProperties
 	_initializeScheme: function () {
 		var s = this._inherited(BetaJS.Modelling.AssociatedProperties, "_initializeScheme");
 		s[this.primary_key()] = {
-			type: "id"
+			type: "id",
+			tags: ["read"]
 		};
 		return s;
 	}
@@ -2344,8 +2344,7 @@ BetaJS.Modelling.AssociatedProperties.extend("BetaJS.Modelling.Model", {
 		this.__silent++;
 		this.setAll(data);
 		this.__silent--;
-		if (this.option("auto_update") && !this.isNew())
-			this.save();
+		return this.isNew() ? BetaJS.Promise.create(true) : this.save();
 	},
 
 	_afterSet: function (key, value, old_value, options) {

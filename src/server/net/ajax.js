@@ -30,10 +30,15 @@ BetaJS.Net.AbstractAjax.extend("BetaJS.Server.Net.HttpAjax", {
 			result.on("data", function (chunk) {
 				data += chunk;
 			}).on("end", function () {
-				if (result.statusCode >= 200 && result.statusCode < 300) 
-					BetaJS.SyncAsync.callback(callbacks, "success", data);
-				else
-					BetaJS.SyncAsync.callback(callbacks, "exception", data);
+				if (result.statusCode >= 200 && result.statusCode < 300) {
+					if (callbacks && callbacks.success)
+						callbacks.success.call(callbacks.context || this, data);
+				} else {
+					if (callbacks && callbacks.exception)
+						callbacks.exception.call(callbacks.context || this, data);
+				}
+				if (callbacks && callbacks.complete)
+					callbacks.complete.call(callbacks.context || this);
 			});
 		});
 		if (post_data && post_data.length > 0)

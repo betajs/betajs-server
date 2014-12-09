@@ -1,5 +1,5 @@
 /*!
-betajs-server - v1.0.0 - 2014-12-07
+betajs-server - v1.0.0 - 2014-12-09
 Copyright (c) Oliver Friedmann
 MIT Software License.
 */
@@ -35,10 +35,15 @@ BetaJS.Net.AbstractAjax.extend("BetaJS.Server.Net.HttpAjax", {
 			result.on("data", function (chunk) {
 				data += chunk;
 			}).on("end", function () {
-				if (result.statusCode >= 200 && result.statusCode < 300) 
-					BetaJS.SyncAsync.callback(callbacks, "success", data);
-				else
-					BetaJS.SyncAsync.callback(callbacks, "exception", data);
+				if (result.statusCode >= 200 && result.statusCode < 300) {
+					if (callbacks && callbacks.success)
+						callbacks.success.call(callbacks.context || this, data);
+				} else {
+					if (callbacks && callbacks.exception)
+						callbacks.exception.call(callbacks.context || this, data);
+				}
+				if (callbacks && callbacks.complete)
+					callbacks.complete.call(callbacks.context || this);
 			});
 		});
 		if (post_data && post_data.length > 0)
@@ -152,7 +157,7 @@ BetaJS.Class.extend("BetaJS.Server.Net.Imap", [
 		this.__imap.on("error", function () {
 			self.trigger("error");
 			if (options.reconnect_on_error)
-				BetaJS.SyncAsync.eventually(self.reconnect, [], self);
+				BetaJS.Async.eventually(self.reconnect, [], self);
 		});
 	},
 	
@@ -451,6 +456,8 @@ BetaJS.Class.extend("BetaJS.Server.Sessions.Manager", [
     },
     
     find_session: function (token) {
+    	if (!token)
+    		return BetaJS.Promise.value(null);
     	var session = this.__sessions.get(token);
     	return session ? BetaJS.Promise.create(session) : this.__lookup_session(token);
     },
@@ -1093,8 +1100,10 @@ BetaJS.Databases.DatabaseTable.extend("BetaJS.Databases.MongoDatabaseTable", {
 		var obj = BetaJS.Objs.clone(data, 1);
 		if ("id" in data) {
 			delete obj["id"];
-            var objid = this._database.mongo_object_id();
-            obj._id = new objid(data.id + "");
+			if (data.id !== null) {
+	            var objid = this._database.mongo_object_id();
+	            obj._id = new objid(data.id + "");
+			}
 		}
 		return obj;
 	},
