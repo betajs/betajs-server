@@ -1,15 +1,11 @@
 /*!
-betajs-server - v1.0.0 - 2014-12-09
+betajs-server - v1.0.0 - 2014-12-13
 Copyright (c) Oliver Friedmann
 MIT Software License.
 */
 BetaJS.Net.AbstractAjax.extend("BetaJS.Server.Net.HttpAjax", {
-
-	_syncCall: function (options) {
-		throw "Unsupported";
-	},
 	
-	_asyncCall: function (options, callbacks) {
+	_asyncCall: function (options) {
 		var parsed = BetaJS.Net.Uri.parse(options.uri);
 		var opts = {
 			method: options.method,
@@ -30,25 +26,22 @@ BetaJS.Net.AbstractAjax.extend("BetaJS.Server.Net.HttpAjax", {
 				    };
 			}			
 		}
+		var promise = BetaJS.Promise.create();
 		var request = this.cls.http().request(opts, function (result) {
 			var data = "";
 			result.on("data", function (chunk) {
 				data += chunk;
 			}).on("end", function () {
-				if (result.statusCode >= 200 && result.statusCode < 300) {
-					if (callbacks && callbacks.success)
-						callbacks.success.call(callbacks.context || this, data);
-				} else {
-					if (callbacks && callbacks.exception)
-						callbacks.exception.call(callbacks.context || this, data);
-				}
-				if (callbacks && callbacks.complete)
-					callbacks.complete.call(callbacks.context || this);
+				if (result.statusCode >= 200 && result.statusCode < 300)
+					promise.asyncSuccess(data);
+				else
+					promise.asyncError(data);
 			});
 		});
 		if (post_data && post_data.length > 0)
 			request.write(post_data);
 		request.end();
+		return promise;
 	}
 
 }, {

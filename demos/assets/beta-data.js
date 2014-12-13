@@ -1,5 +1,5 @@
 /*!
-betajs-data - v1.0.0 - 2014-12-09
+betajs-data - v1.0.0 - 2014-12-13
 Copyright (c) Oliver Friedmann
 MIT Software License.
 */
@@ -752,8 +752,8 @@ BetaJS.Stores.BaseStore = BetaJS.Stores.ListenerStore.extend("BetaJS.Stores.Base
 		}
 		var promise = BetaJS.Promise.and();
 		for (var i = 0; i < data.length; ++i)
-			and = promise.and(this.insert(event_data ? [data[i], event_data] : data[i]));
-		return and.end();
+			promise = promise.and(this.insert(event_data ? [data[i], event_data] : data[i]));
+		return promise.end();
 	},
 
 	remove: function (id) {
@@ -1742,9 +1742,7 @@ BetaJS.Stores.BaseStore.extend("BetaJS.Stores.RemoteStore", {
 	},
 	
 	__invoke: function (options, parse_json) {
-		var promise = BetaJS.Promise.create();
-		this.__ajax.asyncCall(options, promise.asCallback());
-		return promise.mapCallback(function (e, result) {
+		return this.__ajax.asyncCall(options).mapCallback(function (e, result) {
 			if (e)
 				return new BetaJS.Stores.RemoteStoreException(e);
 			if (parse_json && BetaJS.Types.is_string(result)) {
@@ -2613,9 +2611,12 @@ BetaJS.Modelling.Associations.TableAssociation.extend("BetaJS.Modelling.Associat
 BetaJS.Modelling.Associations.TableAssociation.extend("BetaJS.Modelling.Associations.BelongsToAssociation", {
 	
 	_yield: function () {
+		var value = this._model.get(this._foreign_key);
+		if (!value)
+			return BetaJS.Promise.value(null);
 		return this._primary_key ?
-			this._foreign_table.findBy(BetaJS.Objs.objectBy(this._primary_key, this._model.get(this._foreign_key))) :
-			this._foreign_table.findById(this._model.get(this._foreign_key));
+			this._foreign_table.findBy(BetaJS.Objs.objectBy(this._primary_key, value)) :
+			this._foreign_table.findById(value);
 	}
 	
 });
