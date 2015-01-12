@@ -1,8 +1,12 @@
 BetaJS.Class.extend("BetaJS.Server.Session.SocketsManagerHelper", {
 	
-	constructor: function (manager) {
+	constructor: function (manager, options) {
 		this._inherited(BetaJS.Server.Session.SocketsManagerHelper, "constructor");
 		this.__manager = manager;
+		manager.sockets_manager_helper = this;
+		this.__options = BetaJS.Objs.extend({
+			remove_on_disconnect: false
+		}, options);
 		manager.bind_socket = function (socket, session_cookie, data) {
 			var session_token = BetaJS.Strings.read_cookie_string(socket.handshake.headers.cookie, session_cookie, data);
 	        this.find_session(session_token).success(function (session) {
@@ -56,9 +60,13 @@ BetaJS.Class.extend("BetaJS.Server.Session.SocketsHelper", {
     },
     
     unbind: function () {
-        this.__socket = null;
-        this.__active_session.activity();
-        this.__active_session.trigger("unbind_socket");
+    	if (this.__socket) {
+	        this.__socket = null;
+	        this.__active_session.activity();
+	        this.__active_session.trigger("unbind_socket");
+	        if (this.__active_session.session().manager().sockets_manager_helper.__options.remove_on_disconnect)
+	        	this.__active_session.destroy();
+    	}
     },
     
     socket: function () {
