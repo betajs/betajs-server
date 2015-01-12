@@ -1,5 +1,5 @@
 /*!
-betajs-server - v1.0.0 - 2014-12-13
+betajs-server - v1.0.0 - 2015-01-11
 Copyright (c) Oliver Friedmann
 MIT Software License.
 */
@@ -691,6 +691,10 @@ BetaJS.Class.extend("BetaJS.Server.Sessions.ActiveSession", [
         this._inherited(BetaJS.Server.Sessions.ActiveSession, "destroy");
     },
     
+    session: function () {
+    	return this.__helper.session();
+    },
+    
     options: function () {
         return this.__options;
     },
@@ -896,7 +900,7 @@ BetaJS.Class.extend("BetaJS.Server.Session.SocketsHelper", {
     },
     
     destroy: function () {
-        this.unbind_socket();
+        this.unbind();
         this._inherited(BetaJS.Server.Session.SocketsHelper, "destroy");
     },    
 

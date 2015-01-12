@@ -147,6 +147,10 @@ BetaJS.Class.extend("BetaJS.Server.Sessions.ActiveSession", [
         this._inherited(BetaJS.Server.Sessions.ActiveSession, "destroy");
     },
     
+    session: function () {
+    	return this.__helper.session();
+    },
+    
     options: function () {
         return this.__options;
     },

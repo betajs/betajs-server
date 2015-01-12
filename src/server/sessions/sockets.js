@@ -35,7 +35,7 @@ BetaJS.Class.extend("BetaJS.Server.Session.SocketsHelper", {
     },
     
     destroy: function () {
-        this.unbind_socket();
+        this.unbind();
         this._inherited(BetaJS.Server.Session.SocketsHelper, "destroy");
     },    
 
