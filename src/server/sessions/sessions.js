@@ -21,7 +21,7 @@ BetaJS.Class.extend("BetaJS.Server.Sessions.Manager", [
         this.__options = options;
         this._session_class = options.session_class || this._session_class;
         if (BetaJS.Types.is_string(this._session_class))
-        	this._session_class = BetaJS.Scopes.resolve(this._session_class);
+        	this._session_class = Scoped.getGlobal(this._session_class);
         if (options.invalidation.timer) {
         	this.__timer = this._auto_destroy(new BetaJS.Timers.Timer({
 			    fire : this.invalidate,

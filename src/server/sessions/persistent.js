@@ -18,7 +18,7 @@ BetaJS.Class.extend("BetaJS.Server.Session.PersistentSessionManagerHelper", {
         this.__store = options.store ? options.store : this._auto_destroy(new BetaJS.Stores.MemoryStore());
         this._persistent_session_model = options.persistent_session_model || this._persistent_session_model;
         if (BetaJS.Types.is_string(this._persistent_session_model))
-        	this._persistent_session_model = BetaJS.Scopes.resolve(this._persistent_session_model);
+        	this._persistent_session_model = BScoped.getGlobal(this._persistent_session_model);
         if (options.invalidation.timer) {
         	this.__timer = this._auto_destroy(new BetaJS.Timers.Timer({
 			    fire : this.invalidate,

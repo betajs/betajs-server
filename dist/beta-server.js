@@ -1,5 +1,5 @@
 /*!
-betajs-server - v1.0.0 - 2015-01-12
+betajs-server - v1.0.0 - 2015-02-22
 Copyright (c) Oliver Friedmann
 MIT Software License.
 */
@@ -408,7 +408,7 @@ BetaJS.Class.extend("BetaJS.Server.Sessions.Manager", [
         this.__options = options;
         this._session_class = options.session_class || this._session_class;
         if (BetaJS.Types.is_string(this._session_class))
-        	this._session_class = BetaJS.Scopes.resolve(this._session_class);
+        	this._session_class = Scoped.getGlobal(this._session_class);
         if (options.invalidation.timer) {
         	this.__timer = this._auto_destroy(new BetaJS.Timers.Timer({
 			    fire : this.invalidate,
@@ -560,7 +560,7 @@ BetaJS.Class.extend("BetaJS.Server.Session.ActiveSessionManagerHelper", {
         this.__options = options;
         this._active_session_class = options.active_session_class || this._active_session_class;
         if (BetaJS.Types.is_string(this._active_session_class))
-        	this._active_session_class = BetaJS.Scopes.resolve(this._active_session_class);
+        	this._active_session_class = Scoped.getGlobal(this._active_session_class);
         manager.__add_active_session = function (session, active_session) {
         	this._helper("__add_active_session", session, active_session);
         };
@@ -747,7 +747,7 @@ BetaJS.Class.extend("BetaJS.Server.Session.PersistentSessionManagerHelper", {
         this.__store = options.store ? options.store : this._auto_destroy(new BetaJS.Stores.MemoryStore());
         this._persistent_session_model = options.persistent_session_model || this._persistent_session_model;
         if (BetaJS.Types.is_string(this._persistent_session_model))
-        	this._persistent_session_model = BetaJS.Scopes.resolve(this._persistent_session_model);
+        	this._persistent_session_model = BScoped.getGlobal(this._persistent_session_model);
         if (options.invalidation.timer) {
         	this.__timer = this._auto_destroy(new BetaJS.Timers.Timer({
 			    fire : this.invalidate,
