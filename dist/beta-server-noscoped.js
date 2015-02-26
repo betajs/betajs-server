@@ -3,11 +3,6 @@ betajs-server - v1.0.0 - 2015-02-26
 Copyright (c) Oliver Friedmann
 MIT Software License.
 */
-/*!
-betajs-server - v1.0.0 - 2015-02-26
-Copyright (c) Oliver Friedmann
-MIT Software License.
-*/
 (function () {
 
 var Scoped = this.subScope();

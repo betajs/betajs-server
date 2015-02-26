@@ -4,35 +4,56 @@ module.exports = function(grunt) {
 
 	grunt.initConfig({
 		pkg : grunt.file.readJSON('package.json'),
+		'revision-count': {
+		    options: {
+		      property: 'revisioncount',
+		      ref: 'HEAD'
+		    }
+		},
 		concat : {
 			options : {
 				banner : module.banner
 			},
-			dist: {
-				dest: 'dist/beta-server.js',
-				src: [
-					'src/server/net/*.js',
+			dist_raw : {
+				dest : 'dist/beta-server-raw.js',
+				src : [
+					'src/fragments/begin.js-fragment',
 					
-                    'src/server/sessions/sessions.js',
-                    'src/server/sessions/*.js',
-
-					'src/server/databases/databases.js',
-					'src/server/databases/database_tables.js',
-					'src/server/databases/mongo_database.js',
-					'src/server/databases/mongo_database_table.js',
-					'src/server/stores/database_store.js',
-					'src/server/stores/mongo_database_store.js',
-					'src/server/stores/migrator.js',
-					'src/server/stores/imap_store.js'
+					'src/net/*.js',
+                    'src/sessions/*.js',
+					'src/databases/*.js',
+					'src/stores/*.js',
+					'src/fragments/end.js-fragment'
 				]
 			},
+			dist_scoped: {
+				dest : 'dist/beta-server.js',
+				src : [
+				    'vendors/scoped.js',
+				    'dist/beta-server-noscoped.js'
+				]
+			}
 		},
+		preprocess : {
+			options: {
+			    context : {
+			    	MAJOR_VERSION: '<%= revisioncount %>',
+			    	MINOR_VERSION: (new Date()).getTime()
+			    }
+			},
+			dist : {
+			    src : 'dist/beta-server-raw.js',
+			    dest : 'dist/beta-server-noscoped.js'
+			}
+		},	
+		clean: ["dist/beta-server-raw.js"],
 		uglify : {
 			options : {
 				banner : module.banner
 			},
 			dist : {
 				files : {
+					'dist/beta-server-noscoped.min.js' : [ 'dist/beta-server-noscoped.js' ],					
 					'dist/beta-server.min.js' : [ 'dist/beta-server.js' ],					
 				}
 			}
@@ -55,8 +76,12 @@ module.exports = function(grunt) {
 	grunt.loadNpmTasks('grunt-contrib-concat');
 	grunt.loadNpmTasks('grunt-contrib-uglify');
 	grunt.loadNpmTasks('grunt-shell');	
+	grunt.loadNpmTasks('grunt-git-revision-count');
+	grunt.loadNpmTasks('grunt-preprocess');
+	grunt.loadNpmTasks('grunt-contrib-clean');	
+	
 
-	grunt.registerTask('default', ['newer:concat', 'newer:uglify']);
+	grunt.registerTask('default', ['revision-count', 'concat:dist_raw', 'preprocess', 'clean', 'concat:dist_scoped', 'uglify']);
 	grunt.registerTask('lint', ['shell:lint']);	
 	grunt.registerTask('check', ['lint']);
 
