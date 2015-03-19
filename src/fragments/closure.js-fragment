@@ -1,0 +1,4 @@
+var global = {};
+var module = {};
+var require = function (module) {};
+var Buffer = function () {};

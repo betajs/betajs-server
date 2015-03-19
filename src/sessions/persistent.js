@@ -53,7 +53,7 @@ Scoped.define("module:Sessions.PersistentSessionManagerHelper", [
 		        this.__store = options.store ? options.store : this._auto_destroy(new MemoryStore());
 		        this._persistent_session_model = options.persistent_session_model || this._persistent_session_model;
 		        if (Types.is_string(this._persistent_session_model))
-		        	this._persistent_session_model = BScoped.getGlobal(this._persistent_session_model);
+		        	this._persistent_session_model = Scoped.getGlobal(this._persistent_session_model);
 		        if (options.invalidation.timer) {
 		        	this.__timer = this._auto_destroy(new Timer({
 					    fire : this.invalidate,

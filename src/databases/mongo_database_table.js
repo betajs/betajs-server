@@ -46,7 +46,7 @@ Scoped.define("module:Databases.MongoDatabaseTable", [
 						result = result.skip(options.skip);
 					if ("limit" in options)
 						result = result.limit(options.limit);
-					return Promise.funcCallback(result, result.toArray).mapSuccess(function (cols) {
+					return Promise.funcCallback(result, result.asArray).mapSuccess(function (cols) {
 						return new ArrayIterator(cols);
 					}, this);
 				}, this);

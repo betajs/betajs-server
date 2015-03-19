@@ -1,5 +1,5 @@
 /*!
-betajs-server - v1.0.0 - 2015-02-26
+betajs-server - v1.0.0 - 2015-03-19
 Copyright (c) Oliver Friedmann
 MIT Software License.
 */
@@ -15,7 +15,7 @@ Scoped.binding("data", "global:BetaJS.Data");
 Scoped.define("module:", function () {
 	return {
 		guid: "9955100d-6a88-451f-9a85-004523eb8589",
-		version: '11.1424924563503'
+		version: '12.1426784755879'
 	};
 });
 
@@ -516,7 +516,7 @@ Scoped.define("module:Sessions.ActiveSessionHelper", [
 		    },
 		
 		    new_active_session: function (token, options) {
-		        active_session = new this.__helper._active_session_class(this, token || this.__generate_token(), options);
+		        var active_session = new this.__helper._active_session_class(this, token || this.__generate_token(), options);
 		        this.__add_active_session(active_session);
 		        return active_session;
 		    },
@@ -710,7 +710,7 @@ Scoped.define("module:Sessions.PersistentSessionManagerHelper", [
 		        this.__store = options.store ? options.store : this._auto_destroy(new MemoryStore());
 		        this._persistent_session_model = options.persistent_session_model || this._persistent_session_model;
 		        if (Types.is_string(this._persistent_session_model))
-		        	this._persistent_session_model = BScoped.getGlobal(this._persistent_session_model);
+		        	this._persistent_session_model = Scoped.getGlobal(this._persistent_session_model);
 		        if (options.invalidation.timer) {
 		        	this.__timer = this._auto_destroy(new Timer({
 					    fire : this.invalidate,
@@ -1316,7 +1316,7 @@ Scoped.define("module:Databases.MongoDatabaseTable", [
 						result = result.skip(options.skip);
 					if ("limit" in options)
 						result = result.limit(options.limit);
-					return Promise.funcCallback(result, result.toArray).mapSuccess(function (cols) {
+					return Promise.funcCallback(result, result.asArray).mapSuccess(function (cols) {
 						return new ArrayIterator(cols);
 					}, this);
 				}, this);
@@ -1456,7 +1456,7 @@ Scoped.define("module:Stores.ImapStore", [
 		
 			_query: function (query, options) {
 				var self = this;
-				var imap = new Net.Imap(this.__imap, this.__imap_opts);
+				var imap = new Imap(this.__imap, this.__imap_opts);
 				return imap.connect().mapSuccess(function () {
 					var opts = {};
 					if ("skip" in options)
@@ -1583,10 +1583,15 @@ Scoped.define("module:Stores.Migrator", [
 					} catch (e) {
 						this._log("Failure! Rolling back " + migration.version + "...\n");
 						try {
-							migration.partial_rollback();
-						} catch (e) {
+							if ("partial_rollback" in migration)
+								migration.partial_rollback();
+							else if ("rollback" in migration)
+								migration.rollback();
+							else
+								throw "No rollback defined";
+						} catch (ex) {
 							this._log("Failure! Couldn't roll back " + migration.version + "!\n");
-							throw e;
+							throw ex;
 						}
 						this._log("Rolled back " + migration.version + "!\n");
 						throw e;
@@ -1596,7 +1601,7 @@ Scoped.define("module:Stores.Migrator", [
 			
 			rollback: function (version) {
 				var current = this._indexByVersion(this.version());
-				var target = Types.is_defined(version) ? this._indexByVersion(target) : -1;
+				var target = Types.is_defined(version) ? this._indexByVersion(version) : current-1;
 				while (current > target) {
 					var migration = this.__migrations[current];
 					this._log("Rollback " + migration.version + ": " + migration.title + " - " + migration.description + "...\n");

@@ -66,10 +66,15 @@ Scoped.define("module:Stores.Migrator", [
 					} catch (e) {
 						this._log("Failure! Rolling back " + migration.version + "...\n");
 						try {
-							migration.partial_rollback();
-						} catch (e) {
+							if ("partial_rollback" in migration)
+								migration.partial_rollback();
+							else if ("rollback" in migration)
+								migration.rollback();
+							else
+								throw "No rollback defined";
+						} catch (ex) {
 							this._log("Failure! Couldn't roll back " + migration.version + "!\n");
-							throw e;
+							throw ex;
 						}
 						this._log("Rolled back " + migration.version + "!\n");
 						throw e;
@@ -79,7 +84,7 @@ Scoped.define("module:Stores.Migrator", [
 			
 			rollback: function (version) {
 				var current = this._indexByVersion(this.version());
-				var target = Types.is_defined(version) ? this._indexByVersion(target) : -1;
+				var target = Types.is_defined(version) ? this._indexByVersion(version) : current-1;
 				while (current > target) {
 					var migration = this.__migrations[current];
 					this._log("Rollback " + migration.version + ": " + migration.title + " - " + migration.description + "...\n");

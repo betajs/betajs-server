@@ -74,7 +74,7 @@ Scoped.define("module:Sessions.ActiveSessionHelper", [
 		    },
 		
 		    new_active_session: function (token, options) {
-		        active_session = new this.__helper._active_session_class(this, token || this.__generate_token(), options);
+		        var active_session = new this.__helper._active_session_class(this, token || this.__generate_token(), options);
 		        this.__add_active_session(active_session);
 		        return active_session;
 		    },

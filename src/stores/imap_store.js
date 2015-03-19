@@ -30,7 +30,7 @@ Scoped.define("module:Stores.ImapStore", [
 		
 			_query: function (query, options) {
 				var self = this;
-				var imap = new Net.Imap(this.__imap, this.__imap_opts);
+				var imap = new Imap(this.__imap, this.__imap_opts);
 				return imap.connect().mapSuccess(function () {
 					var opts = {};
 					if ("skip" in options)
