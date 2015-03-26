@@ -64,7 +64,7 @@ Scoped.define("module:Databases.MongoDatabase", [
 	    },
 	
 	    objectToUri : function(object) {
-	        object["path"] = object["database"];
+	        object.path = object.database;
 	        return Uri.build(object);
 	    }
 	    

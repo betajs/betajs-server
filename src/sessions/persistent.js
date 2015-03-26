@@ -6,11 +6,11 @@ Scoped.define("module:Sessions.PersistentSessionModel", [
     		    	
 			_initializeScheme: function () {
 				var scheme = inherited._initializeScheme.call(this);
-				scheme["token"] = {
+				scheme.token = {
 					type: "string",
 					index: true
 				};
-				scheme["created"] = {
+				scheme.created = {
 					type: "date",
 					index: true
 				};

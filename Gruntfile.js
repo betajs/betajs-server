@@ -54,34 +54,22 @@ module.exports = function(grunt) {
 			dist : {
 				files : {
 					'dist/beta-server-noscoped.min.js' : [ 'dist/beta-server-noscoped.js' ],					
-					'dist/beta-server.min.js' : [ 'dist/beta-server.js' ],					
+					'dist/beta-server.min.js' : [ 'dist/beta-server.js' ]	
 				}
 			}
 		},
-		shell: {
-			lint: {
-		    	command: "jsl +recurse --process ./src/*.js",
-		    	options: {
-                	stdout: true,
-                	stderr: true,
-            	},
-            	src: [
-            		"src/*/*.js"
-            	]
+		jshint : {
+			options: {
+				es5: false,
+				es3: true
 			},
-			lintfinal : {
-				command : "jsl --process ./dist/beta-server.js",
-				options : {
-					stdout : true,
-					stderr : true,
-				},
-				src : [ "src/*/*.js" ]
-			}
+			source : [ "./src/*/*.js" ],
+			dist : [ "./dist/beta-server-noscoped.js", "./dist/beta-server.js" ],
+			gruntfile : [ "./Gruntfile.js" ]
 		},
 		closureCompiler : {
 			options : {
-				compilerFile : process.env.CLOSURE_PATH
-						+ "/compiler.jar",
+				compilerFile : process.env.CLOSURE_PATH + "/compiler.jar",
 				compilerOpts : {
 					compilation_level : 'ADVANCED_OPTIMIZATIONS',
 					warning_level : 'verbose',
@@ -101,27 +89,29 @@ module.exports = function(grunt) {
 				files : {
 					"./vendors/scoped.js" : "https://raw.githubusercontent.com/betajs/betajs-scoped/master/dist/scoped.js",
 					"./vendors/beta.js" : "https://raw.githubusercontent.com/betajs/betajs/master/dist/beta.js",
-					"./vendors/beta-data-noscoped.js" : "https://raw.githubusercontent.com/betajs/betajs-data/master/dist/beta-data-noscoped.js",
+					"./vendors/beta-data-noscoped.js" : "https://raw.githubusercontent.com/betajs/betajs-data/master/dist/beta-data-noscoped.js"
 				}
 			}
-		},
+		}
 	});
 
-grunt.loadNpmTasks('grunt-newer');
-grunt.loadNpmTasks('grunt-contrib-concat');
-grunt.loadNpmTasks('grunt-contrib-uglify');
-grunt.loadNpmTasks('grunt-shell');
-grunt.loadNpmTasks('grunt-git-revision-count');
-grunt.loadNpmTasks('grunt-preprocess');
-grunt.loadNpmTasks('grunt-contrib-clean');
-grunt.loadNpmTasks('grunt-wget');
-grunt.loadNpmTasks('grunt-closure-tools');
+	grunt.loadNpmTasks('grunt-contrib-concat');
+	grunt.loadNpmTasks('grunt-contrib-uglify');
+	grunt.loadNpmTasks('grunt-git-revision-count');
+	grunt.loadNpmTasks('grunt-preprocess');
+	grunt.loadNpmTasks('grunt-contrib-clean');
+	grunt.loadNpmTasks('grunt-wget');
+	grunt.loadNpmTasks('grunt-closure-tools');
+	grunt.loadNpmTasks('grunt-contrib-jshint');
+	grunt.loadNpmTasks('grunt-node-qunit');
+	grunt.loadNpmTasks('grunt-jsdoc');
 
-
-	grunt.registerTask('default', ['revision-count', 'concat:dist_raw', 'preprocess', 'clean', 'concat:dist_scoped', 'uglify']);
-	grunt.registerTask('lint', [ 'shell:lint', 'shell:lintfinal' ]);
+	grunt.registerTask('default', [ 'revision-count', 'concat:dist_raw',
+			'preprocess', 'clean', 'concat:dist_scoped', 'uglify' ]);
+	grunt.registerTask('lint', [ 'jshint:source', 'jshint:dist',
+			'jshint:gruntfile' ]);
 	grunt.registerTask('check', [ 'lint' ]);
 	grunt.registerTask('dependencies', [ 'wget:dependencies' ]);
 	grunt.registerTask('closure', [ 'closureCompiler', 'clean' ]);
-
+	
 };

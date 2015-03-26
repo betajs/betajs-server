@@ -1,5 +1,5 @@
 /*!
-betajs-data - v1.0.0 - 2015-03-17
+betajs-data - v1.0.0 - 2015-03-26
 Copyright (c) Oliver Friedmann
 MIT Software License.
 */
@@ -14,7 +14,7 @@ Scoped.binding("json", "global:JSON");
 Scoped.define("module:", function () {
 	return {
 		guid: "70ed7146-bb6d-4da4-97dc-5a8e2d23a23f",
-		version: '17.1426632310626'
+		version: '18.1427410587043'
 	};
 });
 
@@ -94,9 +94,9 @@ Scoped.define("module:Queries.Constrained", [
 				if ("sort" in options && !("sort" in execute_options))
 					iter = new SortedIterator(iter, Comparators.byObject(options.sort));
 				if ("skip" in options && !("skip" in execute_options))
-					iter = new SkipIterator(iter, options["skip"]);
+					iter = new SkipIterator(iter, options.skip);
 				if ("limit" in options && !("limit" in execute_options))
-					iter = new LimitIterator(iter, options["limit"]);
+					iter = new LimitIterator(iter, options.limit);
 				return iter;
 			});
 		},
@@ -966,11 +966,11 @@ Scoped.define("module:Stores.ConversionStore", [
 				options.id_key = store._id_key;
 				inherited.constructor.call(this, options);
 				this.__store = store;
-				this.__key_encoding = options["key_encoding"] || {};
-				this.__key_decoding = options["key_decoding"] || {};
-				this.__value_encoding = options["value_encoding"] || {};
-				this.__value_decoding = options["value_decoding"] || {};
-				this.__projection = options["projection"] || {};
+				this.__key_encoding = options.key_encoding || {};
+				this.__key_decoding = options.key_decoding || {};
+				this.__value_encoding = options.value_encoding || {};
+				this.__value_decoding = options.value_decoding || {};
+				this.__projection = options.projection || {};
 			},
 			
 			store: function () {
@@ -1389,8 +1389,8 @@ Scoped.define("module:Stores.RemoteStore", [
 			},
 			
 			prepare_uri: function (action, data) {
-				if (this.__options["uri_mappings"][action])
-					return this.__options["uri_mappings"][action](data);
+				if (this.__options.uri_mappings[action])
+					return this.__options.uri_mappings[action](data);
 				if (action == "remove" || action == "get" || action == "update")
 					return this.getUri() + "/" + data[this._id_key];
 				return this.getUri();
@@ -1487,14 +1487,14 @@ Scoped.define("module:Stores.QueryGetParamsRemoteStore", [
 			_encode_query: function (query, options) {
 				options = options || {};
 				var uri = this.getUri() + "?"; 
-				if (options["skip"] && "skip" in this.__capability_params)
-					uri += this.__capability_params["skip"] + "=" + options["skip"] + "&";
-				if (options["limit"] && "limit" in this.__capability_params)
-					uri += this.__capability_params["limit"] + "=" + options["limit"] + "&";
-				if (options["sort"] && "sort" in this.__capability_params)
-					uri += this.__capability_params["sort"] + "=" + JSON.stringify(options["sort"]) + "&";
+				if (options.skip && "skip" in this.__capability_params)
+					uri += this.__capability_params.skip + "=" + options.skip + "&";
+				if (options.limit && "limit" in this.__capability_params)
+					uri += this.__capability_params.limit + "=" + options.limit + "&";
+				if (options.sort && "sort" in this.__capability_params)
+					uri += this.__capability_params.sort + "=" + JSON.stringify(options.sort) + "&";
 				if ("query" in this.__capability_params)
-					uri += this.__capability_params["query"] + "=" + JSON.stringify(query) + "&";
+					uri += this.__capability_params.query + "=" + JSON.stringify(query) + "&";
 				return {
 					uri: uri
 				};		
@@ -2086,18 +2086,19 @@ Scoped.define("module:Queries.DefaultQueryModel", [
 			
 			register: function (query) {
 				var changed = true;
+				var check = function (query2) {
+					if (Constrained.subsumizes(query, query2)) {
+						this._remove(query2);
+						changed = true;
+					}/* else if (Constrained.mergable(query, query2)) {
+						this._remove(query2);
+						changed = true;
+						query = Constrained.merge(query, query2);
+					} */
+				};
 				while (changed) {
 					changed = false;
-					Objs.iter(this.__queries, function (query2) {
-						if (Constrained.subsumizes(query, query2)) {
-							this._remove(query2);
-							changed = true;
-						}/* else if (Constrained.mergable(query, query2)) {
-							this._remove(query2);
-							changed = true;
-							query = Constrained.merge(query, query2);
-						} */
-					}, this);
+					Objs.iter(this.__queries, check, this);
 				}
 				this._insert(query);
 			},
@@ -2129,7 +2130,7 @@ Scoped.define("module:Queries.StoreQueryModel", [
 				return this.__store.mapSuccess(function (result) {
 					while (result.hasNext()) {
 						var query = result.next();
-						delete query["id"];
+						delete query.id;
 		                this._insert(query);
 					}
 				}, this);
@@ -2440,7 +2441,7 @@ Scoped.define("module:Modelling.SchemedProperties", [
 				delete this.__errors[attr];
 				var scheme = this.cls.scheme();
 				var entry = scheme[attr];
-				var validate = entry["validate"];
+				var validate = entry.validate;
 				if (!validate)
 					return Promise.value(true);
 				if (!Types.is_array(validate))
@@ -2481,42 +2482,44 @@ Scoped.define("module:Modelling.SchemedProperties", [
 				var scheme = this.cls.scheme();
 				var props = this.get_all_properties();
 				tags = tags || {};
-				for (var key in props) {
-					if (key in scheme) {
-						var target = scheme[key]["tags"] || [];
-						var tarobj = {};
-						Objs.iter(target, function (value) {
-							tarobj[value] = true;
-						});
-						var success = true;
-						Objs.iter(tags, function (x) {
-							success = success && x in tarobj;
-						}, this);
-						if (success)
-							rec[key] = props[key];
-					}
-				}
+				var asInner = function (key) {
+					var target = scheme[key].tags || [];
+					var tarobj = {};
+					Objs.iter(target, function (value) {
+						tarobj[value] = true;
+					});
+					var success = true;
+					Objs.iter(tags, function (x) {
+						success = success && x in tarobj;
+					}, this);
+					if (success)
+						rec[key] = props[key];
+				};
+				for (var key in props)
+					if (key in scheme)
+						asInner.call(this, key);
 				return rec;		
 			},
 			
 			setByTags: function (data, tags) {
 				var scheme = this.cls.scheme();
 				tags = tags || {};
-				for (var key in data)  {
-					if (key in scheme) {
-						var target = scheme[key]["tags"] || [];
-						var tarobj = {};
-						Objs.iter(target, function (value) {
-							tarobj[value] = true;
-						});
-						var success = true;
-						Objs.iter(tags, function (x) {
-							success = success && x in tarobj;
-						}, this);
-						if (success)
-							this.set(key, data[key]);
-					}
-				}
+				var setInner = function (key) {
+					var target = scheme[key].tags || [];
+					var tarobj = {};
+					Objs.iter(target, function (value) {
+						tarobj[value] = true;
+					});
+					var success = true;
+					Objs.iter(tags, function (x) {
+						success = success && x in tarobj;
+					}, this);
+					if (success)
+						this.set(key, data[key]);
+				};
+				for (var key in data)
+					if (key in scheme)
+						setInner.call(this, key);
 			},
 			
 			validation_exception_conversion: function (e) {
@@ -2583,7 +2586,7 @@ Scoped.define("module:Modelling.AssociatedProperties", [
 			
 			__addAssoc: function (key, obj) {
 				this[key] = function () {
-					return obj.yield.apply(obj, arguments);
+					return obj.execute.apply(obj, arguments);
 				};
 			},
 			
@@ -2761,7 +2764,7 @@ Scoped.define("module:Modelling.Associations.Association", [
 		  		inherited.constructor.call(this);
 		  		this._model = model;
 		  		this._options = options || {};
-		  		if (options["delete_cascade"]) {
+		  		if (options.delete_cascade) {
 		  			model.on("remove", function () {
 		  				this.__delete_cascade();
 		  			}, this);
@@ -2769,18 +2772,18 @@ Scoped.define("module:Modelling.Associations.Association", [
 		  	},
 		  	
 		  	__delete_cascade: function () {
-		  		this.yield().success(function (iter) {
+		  		this.execute().success(function (iter) {
 					iter = Iterators.ensure(iter);
 					while (iter.hasNext())
 						iter.next().remove({});
 		  		}, this);
 		  	},
 		  	
-		  	yield: function () {
+		  	execute: function () {
 		  		if ("__cache" in this)
 		  			return Promise.create(this.__cache);
-		  		var promise = this._yield();
-		  		if (this._options["cached"]) {
+		  		var promise = this._execute();
+		  		if (this._options.cached) {
 		  			promise.callback(function (error, value) {
 		  				this.__cache = error ? null : value;
 		  			}, this);
@@ -2803,7 +2806,7 @@ Scoped.define("module:Modelling.Associations.BelongsToAssociation", [
     return TableAssociation.extend({scoped: scoped}, function (inherited) {
 		return {
 			
-			_yield: function () {
+			_execute: function () {
 				var value = this._model.get(this._foreign_key);
 				if (!value)
 					return Promise.value(null);
@@ -2828,9 +2831,9 @@ Scoped.define("module:Modelling.Associations.ConditionalAssociation", [
 		  		}, options));
 		  	},
 	
-			_yield: function () {
+			_execute: function () {
 				var assoc = this.assoc();
-				return assoc.yield.apply(assoc, arguments);
+				return assoc.execute.apply(assoc, arguments);
 			},
 			
 			assoc: function () {
@@ -2852,12 +2855,12 @@ Scoped.define("module:Modelling.Associations.HasManyAssociation", [
 				return this._primary_key ? this._model.get(this._primary_key) : this._model.id();
 			},
 		
-			_yield: function () {
+			_execute: function () {
 				return this.allBy();
 			},
 		
-			yield: function () {
-				return inherited.yield.call(this).mapSuccess(function (items) {
+			execute: function () {
+				return inherited.execute.call(this).mapSuccess(function (items) {
 					return new ArrayIterator(items);
 				});
 			},
@@ -2880,7 +2883,7 @@ Scoped.define("module:Modelling.Associations.HasManyThroughArrayAssociation", [
     ], function (HasManyAssociation, Promise, Objs, scoped) {
     return HasManyAssociation.extend({scoped: scoped}, {
 		
-		_yield: function () {
+		_execute: function () {
 			var returnPromise = Promise.create();
 			var promises = Promise.and();
 			Objs.iter(this._model.get(this._foreign_key), function (id) {
@@ -2958,7 +2961,7 @@ Scoped.define("module:Modelling.Associations.HasOneAssociation", [
     ], function (TableAssociation, Objs, scoped) {
     return TableAssociation.extend({scoped: scoped}, {
 	
-		_yield: function (id) {
+		_execute: function (id) {
 			var value = id ? id : (this._primary_key ? this._model.get(this._primary_key) : this._model.id());
 			return this._foreign_table.findBy(Objs.objectBy(this._foreign_key, value));
 		}
@@ -2976,11 +2979,11 @@ Scoped.define("module:Modelling.Associations.PolymorphicHasOneAssociation", [
 				inherited.constructor.call(this, model, options);
 				this._foreign_table_key = foreign_table_key;
 				this._foreign_key = foreign_key;
-				if (options["primary_key"])
+				if (options.primary_key)
 					this._primary_key = options.primary_key;
 			},
 
-			_yield: function (id) {
+			_execute: function (id) {
 				var value = id ? id : (this._primary_key ? this._model.get(this._primary_key) : this._model.id());
 				var foreign_table = Scoped.getGlobal(this._model.get(this._foreign_table_key));
 				return foreign_table.findBy(Objs.objectBy(this._foreign_key, value));

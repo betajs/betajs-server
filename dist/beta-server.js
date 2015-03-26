@@ -1,10 +1,10 @@
 /*!
-betajs-server - v1.0.0 - 2015-03-19
+betajs-server - v1.0.0 - 2015-03-26
 Copyright (c) Oliver Friedmann
 MIT Software License.
 */
 /*!
-betajs-scoped - v0.0.1 - 2015-03-17
+betajs-scoped - v0.0.1 - 2015-03-26
 Copyright (c) Oliver Friedmann
 MIT Software License.
 */
@@ -482,19 +482,20 @@ function newScope (parent, parentNamespace, rootNamespace, globalNamespace) {
 			var deps = [];
 			var environment = {};
 			if (count) {
+				var f = function (value) {
+					if (this.i < deps.length)
+						deps[this.i] = value;
+					count--;
+					if (count === 0) {
+						deps.push(environment);
+						args.callback.apply(args.context || this.ctx, deps);
+					}
+				};
 				for (var i = 0; i < allDependencies.length; ++i) {
 					var ns = this.resolve(allDependencies[i]);
 					if (i < dependencies.length)
 						deps.push(null);
-					ns.namespace.obtain(ns.path, function (value) {
-						if (this.i < deps.length)
-							deps[this.i] = value;
-						count--;
-						if (count === 0) {
-							deps.push(environment);
-							args.callback.apply(args.context || this.ctx, deps);
-						}
-					}, {
+					ns.namespace.obtain(ns.path, f, {
 						ctx: this,
 						i: i
 					});
@@ -522,7 +523,7 @@ var rootScope = newScope(null, rootNamespace, rootNamespace, globalNamespace);
 var Public = Helper.extend(rootScope, {
 		
 	guid: "4b6878ee-cb6a-46b3-94ac-27d91f58d666",
-	version: '8.1426613087189',
+	version: '9.1427403679672',
 		
 	upgrade: Attach.upgrade,
 	attach: Attach.attach,
@@ -536,7 +537,7 @@ Public.exports();
 	return Public;
 }).call(this);
 /*!
-betajs-server - v1.0.0 - 2015-03-19
+betajs-server - v1.0.0 - 2015-03-26
 Copyright (c) Oliver Friedmann
 MIT Software License.
 */
@@ -552,7 +553,7 @@ Scoped.binding("data", "global:BetaJS.Data");
 Scoped.define("module:", function () {
 	return {
 		guid: "9955100d-6a88-451f-9a85-004523eb8589",
-		version: '12.1426784755879'
+		version: '13.1427411488131'
 	};
 });
 
@@ -1200,11 +1201,11 @@ Scoped.define("module:Sessions.PersistentSessionModel", [
     		    	
 			_initializeScheme: function () {
 				var scheme = inherited._initializeScheme.call(this);
-				scheme["token"] = {
+				scheme.token = {
 					type: "string",
 					index: true
 				};
-				scheme["created"] = {
+				scheme.created = {
 					type: "date",
 					index: true
 				};
@@ -1338,9 +1339,9 @@ Scoped.define("module:Sessions.RMIHelper", [
 		    
 		    destroy: function () {
 		        for (var key in this.stubs)
-		            this.stubs[key].destroy;
+		            this.stubs[key].destroy();
 		        for (key in this.skeletons)
-		            this.skeletons[key].destroy;
+		            this.skeletons[key].destroy();
 		        this.__rmi_peer.destroy();
 		        this.__rmi_receiver.destroy();
 		        this.__rmi_sender.destroy();
@@ -1799,7 +1800,7 @@ Scoped.define("module:Databases.MongoDatabase", [
 	    },
 	
 	    objectToUri : function(object) {
-	        object["path"] = object["database"];
+	        object.path = object.database;
 	        return Uri.build(object);
 	    }
 	    
@@ -1825,7 +1826,7 @@ Scoped.define("module:Databases.MongoDatabaseTable", [
 		_encode: function (data) {
 			var obj = Objs.clone(data, 1);
 			if ("id" in data) {
-				delete obj["id"];
+				delete obj.id;
 				if (data.id !== null) {
 		            var objid = this._database.mongo_object_id();
 		            obj._id = new objid(data.id + "");
@@ -1837,7 +1838,7 @@ Scoped.define("module:Databases.MongoDatabaseTable", [
 		_decode: function (data) {
 			var obj = Objs.clone(data, 1);
 			if ("_id" in data) {
-				delete obj["_id"];
+				delete obj._id;
 				obj.id = data._id;
 			}
 			return obj;
@@ -2158,10 +2159,11 @@ Scoped.define("module:Stores.Migrator", [
     });
 });
 
-Scoped.define("module:Stores.MongoDatabaseStore", [      
+Scoped.define("module:Stores.MongoDatabaseStore", [
         "data:Stores.ConversionStore",
+        "base:Objs",                                                   
         "module:Stores.DatabaseStore"
-    ], function (ConversionStore, DatabaseStore, scoped) {
+    ], function (ConversionStore, Objs, DatabaseStore, scoped) {
     return ConversionStore.extend({scoped: scoped}, function (inherited) {
 		return {
 			
@@ -2173,8 +2175,8 @@ Scoped.define("module:Stores.MongoDatabaseStore", [
 		        var ObjectId = database.mongo_object_id();
 		        if (!foreign_id)
 				    types.id = "id";
-				for (var key in types) {
-					if (types[key] == "id") {
+		        Objs.iter(types, function (keyValue, key) {
+					if (keyValue == "id") {
 						encoding[key] = function (value) {
 							return value ? new ObjectId(value + "") : null;
 						};
@@ -2182,7 +2184,7 @@ Scoped.define("module:Stores.MongoDatabaseStore", [
 							return value ? value + "" : null;
 						};
 					}
-				}
+		        }, this);
 				var opts = {
 		            value_encoding: encoding,
 		            value_decoding: decoding

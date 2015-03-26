@@ -34,9 +34,9 @@ Scoped.define("module:Sessions.RMIHelper", [
 		    
 		    destroy: function () {
 		        for (var key in this.stubs)
-		            this.stubs[key].destroy;
+		            this.stubs[key].destroy();
 		        for (key in this.skeletons)
-		            this.skeletons[key].destroy;
+		            this.skeletons[key].destroy();
 		        this.__rmi_peer.destroy();
 		        this.__rmi_receiver.destroy();
 		        this.__rmi_sender.destroy();

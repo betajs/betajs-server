@@ -18,7 +18,7 @@ Scoped.define("module:Databases.MongoDatabaseTable", [
 		_encode: function (data) {
 			var obj = Objs.clone(data, 1);
 			if ("id" in data) {
-				delete obj["id"];
+				delete obj.id;
 				if (data.id !== null) {
 		            var objid = this._database.mongo_object_id();
 		            obj._id = new objid(data.id + "");
@@ -30,7 +30,7 @@ Scoped.define("module:Databases.MongoDatabaseTable", [
 		_decode: function (data) {
 			var obj = Objs.clone(data, 1);
 			if ("_id" in data) {
-				delete obj["_id"];
+				delete obj._id;
 				obj.id = data._id;
 			}
 			return obj;
