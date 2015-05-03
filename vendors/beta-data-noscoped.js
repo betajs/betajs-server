@@ -1,5 +1,5 @@
 /*!
-betajs-data - v1.0.0 - 2015-03-26
+betajs-data - v1.0.0 - 2015-05-03
 Copyright (c) Oliver Friedmann
 MIT Software License.
 */
@@ -14,7 +14,7 @@ Scoped.binding("json", "global:JSON");
 Scoped.define("module:", function () {
 	return {
 		guid: "70ed7146-bb6d-4da4-97dc-5a8e2d23a23f",
-		version: '18.1427410587043'
+		version: '21.1430633248627'
 	};
 });
 
@@ -22,94 +22,114 @@ Scoped.define("module:Queries.Constrained", [
         "json:",
         "module:Queries",
         "base:Types",
-        "base:Comparators",
-        "base:Iterators.ArrayIterator",
-        "base:Iterators.FilteredIterator",
-        "base:Iterators.SortedIterator",
-        "base:Iterators.SkipIterator",
-        "base:Iterators.LimitIterator"
-	], function (JSON, Queries, Types, Comparators, ArrayIterator, FilteredIterator, SortedIterator, SkipIterator, LimitIterator) {
-	return {		
+        "base:Objs",
+        "base:Tokens",
+        "base:Comparators"
+	], function (JSON, Queries, Types, Objs, Tokens, Comparators) {
+	return {
 		
-		make: function (query, options) {
-			return {
-				query: query,
-				options: options || {}
-			};
+		/*
+		 * 
+		 * { query: query, options: options }
+		 * 
+		 * options:
+		 * 	skip: int || 0
+		 *  limit: int || null
+		 *  sort: {
+		 *    key1: 1 || -1,
+		 *    key2: 1 || -1
+		 *  }
+		 * 
+		 */
+		
+		rectify: function (constrainedQuery) {
+			var base = ("options" in constrainedQuery || "query" in constrainedQuery) ? constrainedQuery : { query: constrainedQuery};
+			return Objs.extend({
+				query: {},
+				options: {}
+			}, base);
 		},
 		
-		is_constrained: function (query) {
-			return query && (query.query || query.options);
+		skipValidate: function (options, capabilities) {
+			if ("skip" in options) {
+				if (capabilities)
+					return capabilities.skip;
+			}
+			return true;
 		},
 		
-		format: function (instance) {
-			var query = instance.query;
-			instance.query = Queries.format(query);
-			var result = JSON.stringify(instance);
-			instance.query = query;
-			return result;
+		limitValidate: function (options, capabilities) {
+			if ("limit" in options) {
+				if (capabilities)
+					return capabilities.limit;
+			}
+			return true;
 		},
-		
-		normalize: function (constrained_query) {
-			return {
-				query: "query" in constrained_query ? Queries.normalize(constrained_query.query) : {},
-				options: {
-					skip: "options" in constrained_query && "skip" in constrained_query.options ? constrained_query.options.skip : null,
-					limit: "limit" in constrained_query && "limit" in constrained_query.options ? constrained_query.options.limit : null,
-					sort: "sort" in constrained_query && "sort" in constrained_query.options ? constrained_query.options.sort : {}
-				}
-			};
-		},
-		
-		emulate: function (constrained_query, query_capabilities, query_function, query_context) {
-			var query = constrained_query.query || {};
-			var options = constrained_query.options || {};
-			var execute_query = {};
-			var execute_options = {};
-			if ("sort" in options && "sort" in query_capabilities)
-				execute_options.sort = options.sort;
-			execute_query = query;
-			if ("query" in query_capabilities || Types.is_empty(query)) {
-				execute_query = query;
-				if (!options.sort || ("sort" in query_capabilities)) {
-					if ("skip" in options && "skip" in query_capabilities)
-						execute_options.skip = options.skip;
-					if ("limit" in options && "limit" in query_capabilities) {
-						execute_options.limit = options.limit;
-						if ("skip" in options && !("skip" in query_capabilities))
-							execute_options.limit += options.skip;
-					}
-				}
-			}  
-			return query_function.call(query_context || this, execute_query, execute_options).mapSuccess(function (raw) {
-				var iter = raw;
-				if (raw === null)
-					iter = new ArrayIterator([]);
-				else if (Types.is_array(raw))
-					iter = new ArrayIterator(raw);		
-				if (!("query" in query_capabilities || Types.is_empty(query)))
-					iter = new FilteredIterator(iter, function(row) {
-						return Queries.evaluate(query, row);
+
+		sortValidate: function (options, capabilities) {
+			if ("sort" in options) {
+				if (capabilities && !capabilities.sort)
+					return false;
+				if (capabilities && Types.is_object(capabilities.sort)) {
+					var supported = Objs.all(options.sort, function (dummy, key) {
+						return key in capabilities.sort;
 					});
-				if ("sort" in options && !("sort" in execute_options))
-					iter = new SortedIterator(iter, Comparators.byObject(options.sort));
-				if ("skip" in options && !("skip" in execute_options))
-					iter = new SkipIterator(iter, options.skip);
-				if ("limit" in options && !("limit" in execute_options))
-					iter = new LimitIterator(iter, options.limit);
-				return iter;
-			});
+					if (!supported)
+						return false;
+				}
+			}
+			return true;
 		},
 		
-		subsumizes: function (query, query2) {
-			var qopt = query.options || {};
-			var qopt2 = query2.options || {};
-			var qskip = qopt.skip || 0;
-			var qskip2 = qopt2.skip || 0;
-			var qlimit = qopt.limit || null;
-			var qlimit2 = qopt2.limit || null;
-			var qsort = qopt.sort;
-			var qsort2 = qopt2.sort;
+		constraintsValidate: function (options, capabilities) {
+			return Objs.all(["skip", "limit", "sort"], function (prop) {
+				return this[prop + "Validate"].call(this, options, capabilities);
+			}, this);
+		},
+
+		validate: function (constrainedQuery, capabilities) {
+			constrainedQuery = this.rectify(constrainedQuery);
+			return this.constraintsValidate(constrainedQuery.options, capabilities) && Queries.validate(constrainedQuery.query, capabilities.query || {});
+		},
+		
+		fullConstrainedQueryCapabilities: function (queryCapabilties) {
+			return {
+				query: queryCapabilties,
+				skip: true,
+				limit: true,
+				sort: true // can also be false OR a non-empty object containing keys which can be ordered by
+			};
+		},
+		
+		normalize: function (constrainedQuery) {
+			constrainedQuery = this.rectify(constrainedQuery);
+			return {
+				query: Queries.normalize(constrainedQuery.query),
+				options: constrainedQuery.options
+			};
+		},
+
+		serialize: function (constrainedQuery) {
+			return JSON.stringify(this.rectify(constrainedQuery));
+		},
+		
+		unserialize: function (constrainedQuery) {
+			return JSON.parse(constrainedQuery);
+		},
+		
+		hash: function (constrainedQuery) {
+			return Tokens.simple_hash(this.serialize(constrainedQuery));
+		},
+		
+		subsumizes: function (constrainedQuery, constrainedQuery2) {
+			constrainedQuery = this.rectify(constrainedQuery);
+			constrainedQuery2 = this.rectify(constrainedQuery2);
+			var qskip = constrainedQuery.options.skip || 0;
+			var qskip2 = constrainedQuery2.options.skip || 0;
+			var qlimit = constrainedQuery.options.limit || null;
+			var qlimit2 = constrainedQuery2.options.limit || null;
+			var qsort = constrainedQuery.options.sort;
+			var qsort2 = constrainedQuery.options.sort;
 			if (qskip > qskip2)
 				return false;
 			if (qlimit) {
@@ -120,22 +140,16 @@ Scoped.define("module:Queries.Constrained", [
 			}
 			if ((qskip || qlimit) && (qsort || qsort2) && JSON.stringify(qsort) != JSON.stringify(qsort2))
 				return false;
-			return Queries.subsumizes(query.query, query2.query);
+			return Queries.subsumizes(constrainedQuery.query, constrainedQuery2.query);
 		},
 		
-		serialize: function (query) {
-			return JSON.stringify(this.normalize(query));
-		},
-		
-		unserialize: function (query) {
-			return JSON.parse(query);
-		},
-		
-		mergeable: function (query, query2) {
-			if (Queries.serialize(query.query) != Queries.serialize(query2.query))
+		mergeable: function (constrainedQuery, constrainedQuery2) {
+			constrainedQuery = this.rectify(constrainedQuery);
+			constrainedQuery2 = this.rectify(constrainedQuery2);
+			if (Queries.serialize(constrainedQuery.query) != Queries.serialize(constrainedQuery2.query))
 				return false;
-			var qopts = query.options || {};
-			var qopts2 = query2.options || {};
+			var qopts = constrainedQuery.options;
+			var qopts2 = constrainedQuery2.options;
 			if (JSON.stringify(qopts.sort || {}) != JSON.stringify(qopts2.sort || {}))
 				return false;
 			if ("skip" in qopts) {
@@ -150,19 +164,22 @@ Scoped.define("module:Queries.Constrained", [
 				return !("skip" in qopts2) || (!qopts.limit || (qopts.limit >= qopts2.skip));
 		},
 		
-		merge: function (query, query2) {
-			var qopts = query.options || {};
-			var qopts2 = query2.options || {};
+		merge: function (constrainedQuery, constrainedQuery2) {
+			constrainedQuery = this.rectify(constrainedQuery);
+			constrainedQuery2 = this.rectify(constrainedQuery2);
+			var qopts = constrainedQuery.options;
+			var qopts2 = constrainedQuery2.options;
 			return {
-				query: query.query,
+				query: constrainedQuery.query,
 				options: {
 					skip: "skip" in qopts ? ("skip" in qopts2 ? Math.min(qopts.skip, qopts2.skip): null) : null,
 					limit: "limit" in qopts ? ("limit" in qopts2 ? Math.max(qopts.limit, qopts2.limit): null) : null,
-					sort: query.sort
+					sort: constrainedQuery.sort
 				}
 			};
 		}
-	
+		
+		
 	}; 
 });
 Scoped.define("module:Queries", [
@@ -171,22 +188,239 @@ Scoped.define("module:Queries", [
 	    "base:Sort",
 	    "base:Objs",
 	    "base:Class",
+	    "base:Tokens",
 	    "base:Iterators.ArrayIterator",
-	    "base:Iterators.FilteredIterator"
-	], function (JSON, Types, Sort, Objs, Class, ArrayIterator, FilteredIterator) {
+	    "base:Iterators.FilteredIterator",
+	    "base:Strings",
+	    "base:Comparators"
+	], function (JSON, Types, Sort, Objs, Class, Tokens, ArrayIterator, FilteredIterator, Strings, Comparators) {
+	
+	var SYNTAX_PAIR_KEYS = {
+		"$or": {
+			evaluate_combine: Objs.exists
+		},
+		"$and": {
+			evaluate_combine: Objs.all
+		}
+	};
+	
+	var SYNTAX_CONDITION_KEYS = {
+		"$in": {
+			target: "atoms",
+			evaluate_combine: Objs.exists,
+			evaluate_single: function (object_value, condition_value) {
+				return object_value === condition_value;
+			}
+		}, "$gt": {
+			target: "atom",
+			evaluate_single: function (object_value, condition_value) {
+				return object_value > condition_value;
+			}
+		}, "$lt": {
+			target: "atom",
+			evaluate_single: function (object_value, condition_value) {
+				return object_value < condition_value;
+			}
+		}, "$gte": {
+			target: "atom",
+			evaluate_single: function (object_value, condition_value) {
+				return object_value >= condition_value;
+			}
+		}, "$le": {
+			target: "atom",
+			evaluate_single: function (object_value, condition_value) {
+				return object_value <= condition_value;
+			}
+		}, "$sw": {
+			target: "atom",
+			evaluate_single: function (object_value, condition_value) {
+				return object_value.indexOf(condition_value) === 0;
+			}
+		}, "$ct": {
+			target: "atom",
+			no_index_support: true,
+			evaluate_single: function (object_value, condition_value) {
+				return object_value.indexOf(condition_value) >= 0;
+			}
+		}, "$eq": {
+			target: "atom",
+			evaluate_single: function (object_value, condition_value) {
+				return object_value === condition_value;
+			}
+		}
+	};
+	
+	Objs.iter(Objs.clone(SYNTAX_CONDITION_KEYS, 1), function (value, key) {
+		var valueic = Objs.clone(value, 1);
+		valueic.evaluate_single = function (object_value, condition_value) {
+			return value.evaluate_single(object_value.toLowerCase(), condition_value.toLowerCase());
+		};
+		valueic.ignore_case = true;
+		SYNTAX_CONDITION_KEYS[key + "ic"] = valueic;
+	});
+	
+	
 	return {		
 		
 		/*
 		 * Syntax:
 		 *
+		 * atoms :== [atom, ...]
+		 * atom :== string | int | bool | float
 		 * queries :== [query, ...]
-		 * simples :== [simple, ...]
 		 * query :== {pair, ...}
-		 * pair :== string: value | $or : queries | $and: queries
-		 * value :== simple | {condition, ...}  
-		 * condition :== $in: simples | $gt: simple | $lt: simple | $gte: simple | $le: simple | $sw: simple | $gtic: simple | $ltic: simple | $geic: simple | $leic: simple | $swic: simple | $ct: simple | $ctic: simple
+		 * pair :== key: value | $or : queries | $and: queries
+		 * value :== atom | conditions
+		 * conditions :== {condition, ...}  
+		 * condition :== $in: atoms | $gt: atom | $lt: atom | $gte: atom | $le: atom | $sw: atom | $ct: atom | all with ic
 		 *
 		 */
+		
+		SYNTAX_PAIR_KEYS: SYNTAX_PAIR_KEYS,
+
+		SYNTAX_CONDITION_KEYS: SYNTAX_CONDITION_KEYS,
+		
+		validate: function (query, capabilities) {
+			return this.validate_query(query, capabilities);
+		},
+		
+		validate_atoms: function (atoms, capabilities) {
+			return Types.is_array(atoms) && Objs.all(atoms, this.validate_atom, this);
+		},
+		
+		validate_atom: function (atom) {
+			return true; 
+		},
+		
+		validate_queries: function (queries, capabilities) {
+			return Types.is_array(queries) && Objs.all(queries, function (query) {
+				return this.validate_query(query, capabilities);
+			}, this);
+		},
+		
+		validate_query: function (query, capabilities) {
+			return Types.is_object(query) && Objs.all(query, function (value, key) {
+				return this.validate_pair(value, key, capabilities);
+			}, this);
+		},
+		
+		validate_pair: function (value, key, capabilities) {
+			if (key in this.SYNTAX_PAIR_KEYS) {
+				if (capabilities && (!capabilities.bool || !(key in capabilities.bool)))
+					return false;
+				return this.validate_queries(value, capabilities);
+			}
+			return this.validate_value(value, capabilities);
+		},
+		
+		is_query_atom: function (value) {
+			return value === null || !Types.is_object(value) || Objs.all(value, function (v, key) {
+				return key in this.SYNTAX_CONDITION_KEYS;
+			}, this);
+		},
+		
+		validate_value: function (value, capabilities) {
+			return this.is_query_atom(value) ? this.validate_conditions(value, capabilities) : this.validate_atom(value);
+		},
+		
+		validate_conditions: function (conditions, capabilities) {
+			return Types.is_object(conditions) && Objs.all(conditions, function (value, key) {
+				return this.validate_condition(value, key, capabilities);
+			}, this);
+		},
+		
+		validate_condition: function (value, key, capabilities) {
+			if (capabilities && (!capabilities.conditions || !(key in capabilities.conditions)))
+				return false;
+			var meta = this.SYNTAX_CONDITION_KEYS[key];
+			return meta && (meta.target === "atoms" ? this.validate_atoms(value) : this.validate_atom(value));
+		},
+		
+		normalize: function (query) {
+			return Sort.deep_sort(query);
+		},
+		
+		serialize: function (query) {
+			return JSON.stringify(query);
+		},
+		
+		unserialize: function (query) {
+			return JSON.parse(query);
+		},
+		
+		hash: function (query) {
+			return Tokens.simple_hash(this.serialize(query));
+		},
+		
+		dependencies: function (query) {
+			return Objs.keys(this.dependencies_query(query, {}));
+		},
+		
+		dependencies_queries: function (queries, dep) {
+			Objs.iter(queries, function (query) {
+				dep = this.dependencies_query(query, dep);
+			}, this);
+			return dep;
+		},
+		
+		dependencies_query: function (query, dep) {
+			Objs.iter(query, function (value, key) {
+				dep = this.dependencies_pair(value, key, dep);
+			}, this);
+			return dep;
+		},
+		
+		dependencies_pair: function (value, key, dep) {
+			return key in this.SYNTAX_PAIR_KEYS ? this.dependencies_queries(value, dep) : this.dependencies_key(key, dep);
+		},
+		
+		dependencies_key: function (key, dep) {
+			dep[key] = (dep[key] || 0) + 1;
+			return dep;
+		},
+		
+		evaluate : function(query, object) {
+			return this.evaluate_query(query, object);
+		},
+
+		evaluate_query: function (query, object) {
+			return Objs.all(query, function (value, key) {
+				return this.evaluate_pair(value, key, object);
+			}, this);
+		},
+		
+		evaluate_pair: function (value, key, object) {
+			if (key in this.SYNTAX_PAIR_KEYS) {
+				return this.SYNTAX_PAIR_KEYS[key].evaluate_combine.call(Objs, value, function (query) {
+					return this.evaluate_query(query, object);
+				}, this);
+			} else
+				return this.evaluate_value(value, object[key]);
+		},
+		
+		evaluate_value: function (value, object_value) {
+			return Types.is_object(value) ? this.evaluate_conditions(value, object_value) : this.evaluate_atom(value, object_value);
+		},
+		
+		evaluate_atom: function (value, object_value) {
+			return value === object_value;
+		},
+		
+		evaluate_conditions: function (value, object_value) {
+			return Objs.all(value, function (condition_value, condition_key) {
+				return this.evaluate_condition(condition_value, condition_key, object_value);
+			}, this);
+		},
+		
+		evaluate_condition: function (condition_value, condition_key, object_value) {
+			var rec = this.SYNTAX_CONDITION_KEYS[condition_key];
+			if (rec.target === "atoms") {
+				return rec.evaluate_combine.call(Objs, condition_value, function (condition_single_value) {
+					return rec.evaluate_single.call(this, object_value, condition_single_value);
+				}, this);
+			}
+			return rec.evaluate_single.call(this, object_value, condition_value);
+		},
 		
 		subsumizes: function (query, query2) {
 			// This is very simple at this point
@@ -199,196 +433,191 @@ Scoped.define("module:Queries", [
 			return true;
 		},
 		
-		normalize: function (query) {
-			return Sort.deep_sort(query);
-		},
-		
-		serialize: function (query) {
-			return JSON.stringify(this.normalize(query));
-		},
-		
-		unserialize: function (query) {
-			return JSON.parse(query);
-		},
-		
-		__increase_dependency: function (key, dep) {
-			if (key in dep)
-				dep[key]++;
-			else
-				dep[key] = 1;
-			return dep;		
-		},
-		
-		__dependencies_queries: function (queries, dep) {
-			Objs.iter(queries, function (query) {
-				dep = this.__dependencies_query(query, dep);
-			}, this);
-			return dep;
-		},
-		
-		__dependencies_query: function (query, dep) {
-			for (var key in query)
-				dep = this.__dependencies_pair(key, query[key], dep);
-			return dep;
-		},
-		
-		__dependencies_pair: function (key, value, dep) {
-			if (key == "$or" || key == "$and")
-				return this.__dependencies_queries(value, dep);
-			else
-				return this.__increase_dependency(key, dep);
-		},
-	
-		dependencies : function(query) {
-			return this.__dependencies_query(query, {});
-		},
-			
-		__evaluate_query: function (query, object) {
-			for (var key in query) {
-				if (!this.__evaluate_pair(key, query[key], object))
-					return false;
-			}
-			return true;
-		},
-		
-		__evaluate_pair: function (key, value, object) {
-			if (key == "$or")
-				return this.__evaluate_or(value, object);
-			if (key == "$and")
-				return this.__evaluate_and(value, object);
-			return this.__evaluate_value(value, object[key]);
-		},
-		
-		__evaluate_value: function (value, object_value) {
-			if (Types.is_object(value)) {
-				var result = true;
-				Objs.iter(value, function (tar, op) {
-					if (op == "$in")
-						result = result && Objs.contains_value(tar, object_value);
-					if (op == "$gt")
-						result = result && object_value > tar;
-					if (op == "$gtic")
-						result = result && object_value.toLowerCase() > tar.toLowerCase();
-					if (op == "$lt")
-						result = result && object_value < tar;
-					if (op == "$ltic")
-						result = result && object_value.toLowerCase() < tar.toLowerCase();
-					if (op == "$gte")
-						result = result && object_value >= tar;
-					if (op == "$geic")
-						result = result && object_value.toLowerCase() >= tar.toLowerCase();
-					if (op == "$le")
-						result = result && object_value <= tar;
-					if (op == "$leic")
-						result = result && object_value.toLowerCase() <= tar.toLowerCase();
-					if (op == "$sw")
-						result = result && object_value.indexOf(tar) === 0;
-					if (op == "$swic")
-						result = result && object_value.toLowerCase().indexOf(tar.toLowerCase()) === 0;
-					if (op == "$ct")
-						result = result && object_value.indexOf(tar) >= 0;
-					if (op == "$ctic")
-						result = result && object_value.toLowerCase().indexOf(tar.toLowerCase()) >= 0;
-				}, this);
-				return result;
-			}
-			return value == object_value;
-		},
-		
-		__evaluate_or: function (arr, object) {
-			var result = false;
-			Objs.iter(arr, function (query) {
-				if (this.__evaluate_query(query, object)) {
-					result = true;
-					return false;
-				}
-			}, this);
-			return result;
-		},
-		
-		__evaluate_and: function (arr, object) {
-			var result = true;
-			Objs.iter(arr, function (query) {
-				if (!this.__evaluate_query(query, object)) {
-					result = false;
-					return false;
-				}
-			}, this);
-			return result;
-		},
-		
-		format: function (query) {
-			if (Class.is_class_instance(query))
-				return query.format();
-			return JSON.stringify(query);
-		},
-		
-		overloaded_evaluate: function (query, object) {
-			if (Class.is_class_instance(query))
-				return query.evaluate(object);
-			if (Types.is_function(query))
-				return query(object);
-			return this.evaluate(query, object);
-		},
-		
-		evaluate : function(query, object) {
-			return this.__evaluate_query(query, object);
-		},
-	/*
-		__compile : function(query) {
-			if (Types.is_array(query)) {
-				if (query.length == 0)
-					throw "Malformed Query";
-				var op = query[0];
-				if (op == "Or") {
-					var s = "false";
-					for (var i = 1; i < query.length; ++i)
-						s += " || (" + this.__compile(query[i]) + ")";
-					return s;
-				} else if (op == "And") {
-					var s = "true";
-					for (var i = 1; i < query.length; ++i)
-						s += " && (" + this.__compile(query[i]) + ")";
-					return s;
-				} else {
-					if (query.length != 3)
-						throw "Malformed Query";
-					var key = query[1];
-					var value = query[2];
-					var left = "object['" + key + "']";
-					var right = Types.is_string(value) ? "'" + value + "'" : value;
-					return left + " " + op + " " + right;
-				}
-			} else if (Types.is_object(query)) {
-				var s = "true";
-				for (key in query)
-					s += " && (object['" + key + "'] == " + (Types.is_string(query[key]) ? "'" + query[key] + "'" : query[key]) + ")";
-				return s;
-			} else
-				throw "Malformed Query";
-		},
-	
-		compile : function(query) {
-			var result = this.__compile(query);
-			var func = new Function('object', result);
-			var func_call = function(data) {
-				return func.call(this, data);
+		fullQueryCapabilities: function () {
+			var bool = {};
+			Objs.iter(this.SYNTAX_PAIR_KEYS, function (dummy, key) {
+				bool[key] = true;
+			});
+			var conditions = {};
+			Objs.iter(this.SYNTAX_CONDITION_KEYS, function (dummy, key) {
+				conditions[key] = true;
+			});
+			return {
+				bool: bool,
+				conditions: conditions
 			};
-			func_call.source = 'function(object){\n return ' + result + '; }';
-			return func_call;		
 		},
-	*/	
-		emulate: function (query, query_function, query_context) {
-			var raw = query_function.apply(query_context || this, {});
-			var iter = raw;
-			if (!raw)
-				iter = new ArrayIterator([]);
-			else if (Types.is_array(raw))
-				iter = new ArrayIterator(raw);		
-			return new FilteredIterator(iter, function(row) {
-				return this.evaluate(query, row);
+		
+		mergeConditions: function (conditions1, conditions2) {
+			if (!Types.is_object(conditions1))
+				conditions1 = {"$eq": conditions1 };
+			if (!Types.is_object(conditions2))
+				conditions2 = {"$eq": conditions2 };
+			var fail = false;
+			var obj = Objs.clone(conditions1, 1);
+			Objs.iter(conditions2, function (target, condition) {
+				if (fail)
+					return false;
+				if (condition in obj) {
+					var base = obj[condition];
+					if (Strings.starts_with(condition, "$eq")) 
+						fail = true;
+					if (Strings.starts_with(condition, "$in")) {
+						base = Objs.objectify(base);
+						obj[condition] = [];
+						fail = true;
+						Objs.iter(target, function (x) {
+							if (base[x]) {
+								obj[condition].push(x);
+								fail = false;
+							}
+						});
+					}
+					if (Strings.starts_with(condition, "$sw")) {
+						if (Strings.starts_with(base, target))
+							obj[condition] = target;
+						else if (!Strings.starts_with(target, base))
+							fail = true;
+					}
+					if (Strings.starts_with(condition, "$gt"))
+						if (Comparators.byValue(base, target) < 0)
+							obj[condition] = target;
+					if (Strings.starts_with(condition, "$lt"))
+						if (Comparators.byValue(base, target) > 0)
+							obj[condition] = target;
+				} else
+					obj[condition] = target;
 			}, this);
-		}	
+			if (fail)
+				obj = {"$in": []};
+			return obj;
+		},
+		
+		disjunctiveNormalForm: function (query, mergeKeys) {
+			query = Objs.clone(query, 1);
+			var factors = [];
+			if (query.$or) {
+				var factor = [];
+				Objs.iter(query.$or, function (q) {
+					Objs.iter(this.disjunctiveNormalForm(q, mergeKeys).$or, function (q2) {
+						factor.push(q2);
+					}, this);
+				}, this);
+				factors.push(factor);
+				delete query.$or;
+			}
+			if (query.$and) {
+				Objs.iter(query.$and, function (q) {
+					var factor = [];
+					Objs.iter(this.disjunctiveNormalForm(q, mergeKeys).$or, function (q2) {
+						factor.push(q2);
+					}, this);
+					factors.push(factor);
+				}, this);
+				delete query.$and;
+			}
+			var result = [];
+			var helper = function (base, i) {
+				if (i < factors.length) {
+					Objs.iter(factors[i], function (factor) {
+						var target = Objs.clone(base, 1);
+						Objs.iter(factor, function (value, key) {
+							if (key in target) {
+								if (mergeKeys)
+									target[key] = this.mergeConditions(target[key], value);
+								else {
+									if (!target.$and)
+										target.$and = [];
+									target.$and.push(Objs.objectBy(key, value));
+								}
+							} else
+								target[key] = value;
+						}, this);
+						helper(target, i + 1);
+					}, this);
+				} else
+					result.push(base);
+			};
+			helper(query, 0);
+			return {"$or": result};
+		},
+		
+		simplifyQuery: function (query) {
+			var result = {};
+			Objs.iter(query, function (value, key) {
+				if (key in this.SYNTAX_PAIR_KEYS) {
+					var arr = [];
+					var had_true = false;
+					Objs.iter(value, function (q) {
+						var qs = this.simplifyQuery(q);
+						if (Types.is_empty(qs))
+							had_true = true;
+						else
+							arr.push(qs);
+					}, this);
+					if ((key === "$and" && arr.length > 0) || (key === "$or" && !had_true))
+						result[key] = arr;
+				} else {
+					var conds = this.simplifyConditions(value);
+					if (!Types.is_empty(conds))
+						result[key] = conds;
+				}
+			}, this);
+			return result;
+		},
+		
+		simplifyConditions: function (conditions) {
+			var result = {};
+			Objs.iter(["", "ic"], function (add) {
+				if (conditions["$eq" + add] || conditions["$in" + add]) {
+					var filtered = Objs.filter(conditions["$eq" + add] ? [conditions["$eq" + add]] : conditions["$in" + add], function (inkey) {
+						return this.evaluate_conditions(conditions, inkey);
+					}, this);
+					result[(filtered.length === 1 ? "$eq" : "$in") + add] = filtered.length === 1 ? filtered[0] : filtered;
+				} else {
+					var gt = null;
+					var lt = null;
+					var lte = false;
+					var gte = false;
+					var compare = Comparators.byValue;
+					if (conditions["$gt" + add])
+						gt = conditions["$gt" + add];
+					if (conditions["$lt" + add])
+						gt = conditions["$lt" + add];
+					if (conditions["$gte" + add] && (gt === null || compare(gt, conditions["$gte" + add]) < 0)) {
+						gte = true;
+						gt = conditions["$gte" + add];
+					}
+					if (conditions["$lte" + add] && (lt === null || compare(lt, conditions["$lte" + add]) > 0)) {
+						lte = true;
+						lt = conditions["$lte" + add];
+					}
+					if (conditions["$sw" + add]) {
+						var s = conditions["$sw" + add];
+						if (gt === null || compare(gt, s) <= 0) {
+							gte = true;
+							gt = s;
+						}
+						var swnext = null;
+						if (typeof(s) === 'number')
+							swnext = s + 1;
+						else if (typeof(s) === 'string' && s.length > 0)
+							swnext = s.substring(0, s.length - 1) + String.fromCharCode(s.charCodeAt(s.length - 1) + 1);
+						if (swnext !== null && (lt === null || compare(lt, swnext) >= 0)) {
+							lte = true;
+							lt = swnext;
+						}
+					}				
+					if (lt !== null)
+						result[(lte ? "$lte" : "$lt") + add] = lt;
+					if (gt !== null)
+						result[(gte ? "$gte" : "$gt") + add] = gt;
+					if (conditions["$ct" + add])
+						result["$ct" + add] = conditions["$ct" + add];
+				}
+			}, this);
+			return result;
+		}
 		
 	}; 
 });
@@ -602,6 +831,276 @@ Scoped.define("module:Collections.ActiveQueryCollection", [
     });
 });
 
+Scoped.define("module:Queries.Engine", [
+        "module:Queries",
+        "module:Queries.Constrained",
+        "base:Strings",
+        "base:Types",
+        "base:Objs",
+        "base:Promise",
+        "base:Comparators",
+        "base:Iterators.SkipIterator",
+        "base:Iterators.LimitIterator",
+        "base:Iterators.SortedIterator",
+        "base:Iterators.FilteredIterator",
+        "base:Iterators.SortedOrIterator",
+        "base:Iterators.PartiallySortedIterator",
+        "base:Iterators.ArrayIterator",
+        "base:Iterators.LazyMultiArrayIterator"
+	], function (Queries, Constrained, Strings, Types, Objs, Promise, Comparators, SkipIterator, LimitIterator, SortedIterator, FilteredIterator, SortedOrIterator, PartiallySortedIterator, ArrayIterator, LazyMultiArrayIterator) {
+	return {
+		
+		indexQueryConditionsSize: function (conds, index, ignoreCase) {
+			var add = ignoreCase ? "ic" : "";
+			var postfix = ignoreCase ? "_ic" : "";
+			var info = index.info();
+			var subSize = info.row_count;
+			var rows_per_key = info.row_count / Math.max(info["key_count" + postfix], 1);
+			if (conds["$eq" + add])
+				subSize = rows_per_key;
+			else if (conds["$in" + add])
+				subSize = rows_per_key * conds["$in" + add].length;
+			else {
+				var keys = 0;
+				var g = null;
+				if (conds["$gt" + add] || conds["$gte" + add]) {
+					g = conds["$gt" + add] || conds["$gte" + add];
+					if (conds["$gt" + add])
+						keys--;
+				}
+				var l = null;
+				if (conds["$lt" + add] || conds["$lte" + add]) {
+					l = conds["$lt" + add] || conds["$lte" + add];
+					if (conds["$lt" + add])
+						keys--;
+				}
+				if (g !== null && l !== null)
+					keys += index["key_count_distance" + postfix](g, l);						
+				else if (g !== null)
+					keys += index["key_count_right" + postfix](g);
+				else if (l !== null)
+					keys += index["key_count_left" + postfix](l);
+				subSize = keys * rows_per_key;
+			}
+			return subSize;
+		},
+		
+		indexQuerySize: function (queryDNF, key, index) {
+			var acc = 0;
+			var info = index.info();
+			Objs.iter(queryDNF.$or, function (q) {
+				if (!(key in q)) {
+					acc = null;
+					return false;
+				}
+				var conds = q[key];
+				var findSize = info.row_count;
+				if (index.options().exact)
+					findSize = Math.min(findSize, this.indexQueryConditionsSize(conds, index, false));
+				if (index.options().ignoreCase)
+					findSize = Math.min(findSize, this.indexQueryConditionsSize(conds, index, true));
+				acc += findSize;
+			}, this);
+			return acc;
+		},
+		
+		queryPartially: function (constrainedQuery, constrainedQueryCapabilities) {
+			var simplified = {
+				query: constrainedQuery.query,
+				options: {}
+			};
+			if (constrainedQuery.options.sort) {
+				var first = Objs.ithKey(constrainedQuery.options.sort, 0);
+				simplified.options.sort = {};
+				simplified.options.sort[first] = constrainedQuery.options.sort[first];
+			}
+			return Constrained.validate(simplified, constrainedQueryCapabilities);
+		},
+		
+		compileQuery: function (constrainedQuery, constrainedQueryCapabilities, constrainedQueryFunction, constrainedQueryContext) {
+			constrainedQuery = Constrained.rectify(constrainedQuery);
+			var sorting_supported = Constrained.sortValidate(constrainedQuery.options, constrainedQueryCapabilities);
+			var query_supported = Queries.validate(constrainedQuery.query, constrainedQueryCapabilities.query || {});
+			var skip_supported = Constrained.skipValidate(constrainedQuery.options, constrainedQueryCapabilities);
+			var limit_supported = Constrained.limitValidate(constrainedQuery.options, constrainedQueryCapabilities);
+			var post_actions = {
+				skip: null,
+				limit: null,
+				filter: null,
+				sort: null
+			};
+			if (!query_supported || !sorting_supported || !skip_supported) {
+				post_actions.skip = constrainedQuery.options.skip;
+				delete constrainedQuery.options.skip;
+				if ("limit" in constrainedQuery.options && limit_supported && query_supported && sorting_supported)
+					constrainedQuery.options.limit += post_actions.skip;
+			}
+			if (!query_supported || !sorting_supported || !limit_supported) {
+				post_actions.limit = constrainedQuery.options.limit;
+				delete constrainedQuery.options.limit;
+			}
+			if (!sorting_supported) {
+				post_actions.sort = constrainedQuery.options.sort;
+				delete constrainedQuery.options.sort;
+			}
+			if (!query_supported) {
+				post_actions.filter = constrainedQuery.query;
+				constrainedQuery.query = {};
+			}
+			var query_result = this._queryResultRectify(constrainedQueryFunction.call(constrainedQueryContext, constrainedQuery), false);
+			return query_result.mapSuccess(function (iter) {
+				if (post_actions.filter)
+					iter = new FilteredIterator(iter, function(row) {
+						return Queries.evaluate(post_actions.filter, row);
+					});
+				if (post_actions.sort)
+					iter = new SortedIterator(iter, Comparators.byObject(post_actions.sort));
+				if (post_actions.skip)
+					iter = new SkipIterator(iter, post_actions.skip);
+				if (post_actions.limit)
+					iter = new LimitIterator(iter, post_actions.limit);
+				return iter;
+			}, this);
+		},
+		
+		compileIndexQuery: function (constrainedDNFQuery, key, index) {
+			var fullQuery = Objs.exists(constrainedDNFQuery.query.$or, function (query) {
+				return !(key in query);
+			});
+			var primaryKeySort = constrainedDNFQuery.options.sort && Objs.ithKey(constrainedDNFQuery.options.sort, 0) === key;
+			var primarySortDirection = primaryKeySort ? constrainedDNFQuery.options.sort[key] : 1;
+			var iter;
+			var ignoreCase = !index.options().exact;
+			if (fullQuery) {
+				var materialized = [];
+				index["itemIterate" + (ignoreCase ? "_ic" : "")](null, primarySortDirection, function (dataKey, data) {
+					materialized.push(data);
+				});
+				iter = new ArrayIterator(materialized);
+			} else {
+				iter = new SortedOrIterator(Objs.map(constrainedDNFQuery.query.$or, function (query) {
+					var conds = query[key];
+					if (!primaryKeySort && index.options().ignoreCase && index.options().exact) {
+						if (this.indexQueryConditionsSize(conds, index, true) < this.indexQueryConditionsSize(conds, index, false))
+							ignoreCase = true;
+					}
+					var add = ignoreCase ? "ic" : "";
+					var postfix = ignoreCase ? "_ic" : "";
+					if (conds["$eq" + add]) {
+						var materialized = [];
+						index["itemIterate" + postfix](conds["$eq" + add], primarySortDirection, function (dataKey, data) {
+							if (dataKey !== conds["$eq" + add])
+								return false;
+							materialized.push(data);
+						});
+						iter = new ArrayIterator(materialized);
+					} else if (conds["$in" + add]) {
+						var i = 0;
+						iter = new LazyMultiArrayIterator(function () {
+							if (i >= conds["$in" + add].length)
+								return null;
+							var materialized = [];
+							index["itemIterate" + postfix](conds["$in" + add][i], primarySortDirection, function (dataKey, data) {
+								if (dataKey !== conds["in" + add][i])
+									return false;
+								materialized.push(data);
+							});
+							i++;
+							return materialized;
+						});
+					} else {
+						var currentKey = null;
+						var lastKey = null;
+						if (conds["$gt" + add] || conds["$gte" + add])
+							currentKey = conds["$gt" + add] || conds["$gte" + add];
+						if (conds["$lt" + add] || conds["$lte" + add])
+							lastKey = conds["$lt" + add] || conds["$lte" + add];
+						if (primarySortDirection < 0) {
+							var temp = currentKey;
+							currentKey = lastKey;
+							lastKey = temp;
+						}
+						iter = new LazyMultiArrayIterator(function () {
+							if (currentKey !== null && lastKey !== null) {
+								if (Math.sign((index.comparator())(currentKey, lastKey)) === Math.sign(primarySortDirection))
+									return null;
+							}
+							index["itemIterate" + postfix](currentKey, primarySortDirection, function (dataKey, data) {
+								if (currentKey === null)
+									currentKey = dataKey;
+								if (dataKey !== currentKey) {
+									currentKey = dataKey;
+									return false;
+								}
+								materialized.push(data);
+							});
+							return materialized;
+						});
+					}
+					return iter;
+				}, this), index.comparator());
+			}
+			iter = new FilteredIterator(iter, function (row) {
+				return Queries.evaluate(constrainedDNFQuery.query, row);
+			});
+			if (constrainedDNFQuery.options.sort) {
+				if (primaryKeySort)
+					iter = new PartiallySortedIterator(iter, Comparators.byObject(constrainedDNFQuery.options.sort), function (first, next) {
+						return first[key] === next[key];
+					});
+				else
+					iter = new SortedIterator(iter, Comparators.byObject(constrainedDNFQuery.options.sort));
+			}
+			if (constrainedDNFQuery.options.skip)
+				iter = new SkipIterator(iter, constrainedDNFQuery.options.skip);
+			if (constrainedDNFQuery.options.limit)
+				iter = new LimitIterator(iter, constrainedDNFQuery.options.limit);
+			return Promise.value(iter);
+		},
+		
+		compileIndexedQuery: function (constrainedQuery, constrainedQueryCapabilities, constrainedQueryFunction, constrainedQueryContext, indices) {
+			constrainedQuery = Constrained.rectify(constrainedQuery);
+			indices = indices || {};
+			if (this.queryPartially(constrainedQuery, constrainedQueryCapabilities) || Types.is_empty(indices))
+				return this.compileQuery(constrainedQuery, constrainedQueryCapabilities, constrainedQueryFunction, constrainedQueryContext);
+			if (constrainedQuery.options.sort) {
+				var first = Objs.ithKey(constrainedQuery.options.sort, 0);
+				if (indices[first]) {
+					return this.compileIndexQuery({
+						query: Queries.simplifyQuery(Queries.disjunctiveNormalForm(constrainedQuery.query, true)),
+						options: constrainedQuery.options
+					}, first, indices[first]);
+				}
+			}
+			var dnf = Queries.simplifyQuery(Queries.disjunctiveNormalForm(constrainedQuery.query, true));
+			var smallestSize = null;
+			var smallestKey = null;
+			Objs.iter(indices, function (index, key) {
+				var size = this.indexQuerySize(dnf, key, index);
+				if (size !== null && (smallestSize === null || size < smallestSize)) {
+					smallestSize = size;
+					smallestKey = key;
+				}
+			}, this);
+			if (smallestKey !== null)
+				return this.compileIndexQuery({
+					query: dnf,
+					options: constrainedQuery.options
+				}, smallestKey, indices[smallestKey]);
+			else
+				return this.compileQuery(constrainedQuery, constrainedQueryCapabilities, constrainedQueryFunction, constrainedQueryContext);
+		},
+		
+		_queryResultRectify: function (result, materialize) {
+			result = result || [];
+			return Types.is_array(result) == materialize ? result : (materialize ? result.asArray() : new ArrayIterator(result)); 
+		}
+
+	}; 
+});
+
+
+
 Scoped.define("module:Stores.AssocDumbStore", ["module:Stores.DumbStore"], function (DumbStore, scoped) {
   	return DumbStore.extend({scoped: scoped}, {
 		
@@ -786,13 +1285,13 @@ Scoped.define("module:Stores.ListenerStore", [
 Scoped.define("module:Stores.BaseStore", [
           "module:Stores.ListenerStore",
           "module:Stores.StoreException",
-          "module:Queries.Constrained",
+          "module:Queries.Engine",
           "module:Queries",
           "base:Classes.TimedIdGenerator",
           "base:Promise",
           "base:Types",
           "base:Objs"
-  	], function (ListenerStore, StoreException, Constrained, Queries, TimedIdGenerator, Promise, Types, Objs, scoped) {
+  	], function (ListenerStore, StoreException, QueryEngine, Queries, TimedIdGenerator, Promise, Types, Objs, scoped) {
   	return ListenerStore.extend({scoped: scoped}, function (inherited) {			
   		return {
 				
@@ -804,6 +1303,7 @@ Scoped.define("module:Stores.BaseStore", [
 				if (this._create_ids)
 					this._id_generator = options.id_generator || this._auto_destroy(new TimedIdGenerator());
 				this._query_model = "query_model" in options ? options.query_model : null;
+				this.indices = {};
 			},
 			
 		    query_model: function () {
@@ -905,16 +1405,14 @@ Scoped.define("module:Stores.BaseStore", [
 		    		}
 		    		this.trigger("query_hit", {query: query, options: options}, subsumizer);
 				}
-				return Constrained.emulate(
-						Constrained.make(query, options || {}),
+				return QueryEngine.compileIndexedQuery(
+						{query: query, options: options || {}},
 						this._query_capabilities(),
-						this._query,
-						this);
-			},
-			
-			_query_applies_to_id: function (query, id) {
-				var row = this.get(id);
-				return row && Queries.overloaded_evaluate(query, row);
+						function (constrainedQuery) {
+							return this._query(constrainedQuery.query, constrainedQuery.options);
+						},
+						this,
+						this.indices);
 			},
 			
 			_ensure_index: function (key) {
@@ -1146,12 +1644,6 @@ Scoped.define("module:Stores.DumbStore", [
 				}, this);
 			},
 			
-			_query_capabilities: function () {
-				return {
-					query: true
-				};
-			},
-		
 			_query: function (query, options) {
 				return Promise.tryCatch(function () {
 					var iter = new Iterator();
@@ -1168,15 +1660,7 @@ Scoped.define("module:Stores.DumbStore", [
 								return false;
 							while (this.__id < last_id && !this.__store._read_item(this.__id))
 								this.__id++;
-							while (this.__id <= last_id) {
-								if (this.__store._query_applies_to_id(query, this.__id))
-									return true;
-								if (this.__id < last_id)
-									this.__id = this.__store._read_next_id(this.__id);
-								else
-									this.__id++;
-							}
-							return false;
+							return this.__id <= last_id;
 						},
 						
 						next: function () {
@@ -1460,9 +1944,10 @@ Scoped.define("module:Stores.RemoteStore", [
 
 
 Scoped.define("module:Stores.QueryGetParamsRemoteStore", [
+        "module:Queries",
         "module:Stores.RemoteStore",
         "json:"
-	], function (RemoteStore, JSON, scoped) {
+	], function (Queries, RemoteStore, JSON, scoped) {
 	return RemoteStore.extend({scoped: scoped}, function (inherited) {			
 		return {
                                           			
@@ -1478,7 +1963,7 @@ Scoped.define("module:Stores.QueryGetParamsRemoteStore", [
 				if ("limit" in this.__capability_params)
 					caps.limit = true;
 				if ("query" in this.__capability_params)
-					caps.query = true;
+					caps.query = Queries.fullQueryCapabilities();
 				if ("sort" in this.__capability_params)
 					caps.sort = true;
 				return caps;
@@ -1582,23 +2067,34 @@ Scoped.define("module:Stores.SocketListenerStore", [
 });
 Scoped.define("module:Stores.AbstractIndex", [
 	"base:Class",
-	"base:Comparators"
-], function (Class, Comparators, scoped) {
+	"base:Comparators",
+	"base:Objs",
+	"base:Functions"
+], function (Class, Comparators, Objs, Functions, scoped) {
   	return Class.extend({scoped: scoped}, function (inherited) {
   		return {
   			
-  			constructor: function (store, key, compare) {
+  			constructor: function (store, key, compare, options) {
   				inherited.constructor.call(this);
+  				this._options = Objs.extend({
+  					exact: true,
+  					ignoreCase: false
+  				}, options);
   				this._compare = compare || Comparators.byValue;
   				this._store = store;
+  				this.__row_count = 0;
+  				this._initialize();
   				var id_key = store.id_key();
   				store.query({}).value().iterate(function (row) {
+  					this.__row_count++;
   					this._insert(row[id_key], row[key]);
   				}, this);
   				store.on("insert", function (row) {
+  					this.__row_count++;
   					this._insert(row[id_key], row[key]);
   				}, this);
   				store.on("remove", function (id) {
+  					this.__row_count--;
   					this._remove(id);
   				}, this);
   				store.on("update", function (id, data) {
@@ -1606,10 +2102,32 @@ Scoped.define("module:Stores.AbstractIndex", [
   						this._update(id, data[key]);
   				}, this);
   			},
+  			
+  			_initialize: function () {},
 
   			destroy: function () {
   				this._store.off(null, null, this);
   				inherited.destroy.call(this);
+  			},
+  			
+  			compare: function () {
+  				return this._compare.apply(arguments);
+  			},
+  			
+  			comparator: function () {
+  				return Functions.as_method(this, this._compare);
+  			},
+  			
+  			info: function () {
+  				return {
+  					row_count: this.__row_count,
+  					key_count: this._key_count(),
+  					key_count_ic: this._key_count_ic()
+  				};
+  			},
+  			
+  			options: function () {
+  				return this._options;
   			},
   			
   			iterate: function (key, direction, callback, context) {
@@ -1622,13 +2140,36 @@ Scoped.define("module:Stores.AbstractIndex", [
   				}, this); 
   			},
   			
+  			iterate_ic: function (key, direction, callback, context) {
+  				this._iterate_ic(key, direction, callback, context);
+  			},
+  			
+  			itemIterateIc: function (key, direction, callback, context) {
+  				this.iterate_ic(key, direction, function (iterKey, id) {
+  					return callback.call(context, iterKey, this._store.get(id).value());
+  				}, this); 
+  			},
+
   			_iterate: function (key, direction, callback, context) {},
   			
+  			_iterate_ic: function (key, direction, callback, context) {},
+
   			_insert: function (id, key) {},
   			
   			_remove: function (id) {},
   			
-  			_update: function (id, key) {}
+  			_update: function (id, key) {},
+  			
+  			_key_count: function () {},
+  			
+  			_key_count_ic: function () {},
+  			
+  			key_count_left_ic: function (key) {},
+  			key_count_right_ic: function (key) {},
+  			key_count_distance_ic: function (leftKey, rightKey) {},
+  			key_count_left: function (key) {},
+  			key_count_right: function (key) {},
+  			key_count_distance: function (leftKey, rightKey) {}
   		
   		};
   	});
@@ -1642,28 +2183,46 @@ Scoped.define("module:Stores.MemoryIndex", [
   	return AbstractIndex.extend({scoped: scoped}, function (inherited) {
   		return {
   			
-  			constructor: function (store, key, compare) {
-  				inherited.constructor.call(this, store, key, compare);
-  				this._treeMap = TreeMap.empty(this._compare);
+  			_initialize: function () {
+  				if (this._options.exact)
+  					this._exactMap = TreeMap.empty(this._compare);
+  				if (this._options.ignoreCase)
+  					this._ignoreCaseMap = TreeMap.empty(this._compare);
   				this._idToKey = {};
+  			},
+  			
+  			__insert: function (id, key, map) {
+  				var value = TreeMap.find(key, map);
+  				if (value)
+  					value[id] = true;
+  				else 
+  					map = TreeMap.add(key, Objs.objectBy(id, true), map);
+  				return map;
   			},
   			
   			_insert: function (id, key) {
 				this._idToKey[id] = key;
-  				var value = TreeMap.find(key, this._treeMap);
-  				if (value)
-  					value[id] = true;
-  				else 
-  					this._treeMap = TreeMap.add(key, Objs.objectBy(id, true), this._treeMap);
+				if (this._options.exact)
+					this._exactMap = this.__insert(id, key, this._exactMap);
+				if (this._options.ignoreCase)
+					this._ignoreCaseMap = this.__insert(id, key, this._ignoreCaseMap);
+  			},
+  			
+  			__remove: function (key, map, id) {
+  				var value = TreeMap.find(key, map);
+  				delete value[id];
+  				if (Objs.is_empty(value))
+  					map = TreeMap.remove(key, map);
+  				return map;
   			},
   			
   			_remove: function (id) {
   				var key = this._idToKey[id];
   				delete this._idToKey[id];
-  				var value = TreeMap.find(key, this._treeMap);
-  				delete value[id];
-  				if (Objs.is_empty(value))
-  					this._treeMap = TreeMap.remove(key, this._treeMap);
+  				if (this._options.exact)
+  					this._exactMap = this.__remove(key, this._exactMap, id);
+  				if (this._options.ignoreCase)
+  					this._ignoreCaseMap = this.__remove(key, this._ignoreCaseMap, id);
   			},
   			
   			_update: function (id, key) {
@@ -1675,15 +2234,57 @@ Scoped.define("module:Stores.MemoryIndex", [
   			},
   			
   			_iterate: function (key, direction, callback, context) {
-  				TreeMap.iterate_from(key, this._treeMap, function (iterKey, value) {
+  				TreeMap.iterate_from(key, this._exactMap, function (iterKey, value) {
   					for (var id in value) {
   						if (callback.call(context, iterKey, id) === false)
   							return false;
   					}
   					return true;
   				}, this, !direction);
-  			}  			
+  			},	
   		
+  			_iterate_ic: function (key, direction, callback, context) {
+  				TreeMap.iterate_from(key, this._ignoreCaseMap, function (iterKey, value) {
+  					for (var id in value) {
+  						if (callback.call(context, iterKey, id) === false)
+  							return false;
+  					}
+  					return true;
+  				}, this, !direction);
+  			},	
+
+  			_key_count: function () {
+  				return this._options.exact ? TreeMap.length(this._exactMap) : 0;
+  			},
+  			
+  			_key_count_ic: function () {
+  				return this._options.ignoreCase ? TreeMap.length(this._ignoreCaseMap) : 0;
+  			},
+  			
+  			key_count_left_ic: function (key) {
+  				return TreeMap.treeSizeLeft(key, this._ignoreCaseMap);
+  			},
+  			
+  			key_count_right_ic: function (key) {
+  				return TreeMap.treeSizeRight(key, this._ignoreCaseMap);
+  			},
+  			
+  			key_count_distance_ic: function (leftKey, rightKey) {
+  				return TreeMap.distance(leftKey, rightKey, this._ignoreCaseMap);
+  			},
+  			
+  			key_count_left: function (key) {
+  				return TreeMap.treeSizeLeft(key, this._exactMap);
+  			},
+  			
+  			key_count_right: function (key) {
+  				return TreeMap.treeSizeRight(key, this._exactMap);
+  			},
+  			
+  			key_count_distance: function (leftKey, rightKey) {
+  				return TreeMap.distance(leftKey, rightKey, this._exactMap);
+  			}
+  			
   		};
   	});
 });
@@ -1769,10 +2370,12 @@ Scoped.define("module:Stores.CachedStore", [
 });
 
 Scoped.define("module:Stores.DualStore", [
+          "module:Queries",
+          "module:Queries.Constrained",
           "module:Stores.BaseStore",
           "base:Objs",
           "base:Iterators.ArrayIterator"
-  	], function (BaseStore, Objs, ArrayIterator, scoped) {
+  	], function (Queries, Constrained, BaseStore, Objs, ArrayIterator, scoped) {
   	return BaseStore.extend({scoped: scoped}, function (inherited) {			
   		return {
 			
@@ -1942,12 +2545,7 @@ Scoped.define("module:Stores.DualStore", [
 			},
 		
 			_query_capabilities: function () {
-				return {
-					"query": true,
-					"sort": true,
-					"limit": true,
-					"skip": true
-				};
+				return Constrained.fullConstrainedQueryCapabilities(Queries.fullQueryCapabilities()); 
 			},
 		
 			_get: function (id) {
@@ -2090,7 +2688,7 @@ Scoped.define("module:Queries.DefaultQueryModel", [
 					if (Constrained.subsumizes(query, query2)) {
 						this._remove(query2);
 						changed = true;
-					}/* else if (Constrained.mergable(query, query2)) {
+					}/* else if (Constrained.mergeable(query, query2)) {
 						this._remove(query2);
 						changed = true;
 						query = Constrained.merge(query, query2);

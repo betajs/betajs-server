@@ -1,5 +1,5 @@
 /*!
-betajs-server - v1.0.0 - 2015-03-26
+betajs-server - v1.0.0 - 2015-05-03
 Copyright (c) Oliver Friedmann
 MIT Software License.
 */
@@ -537,7 +537,7 @@ Public.exports();
 	return Public;
 }).call(this);
 /*!
-betajs-server - v1.0.0 - 2015-03-26
+betajs-server - v1.0.0 - 2015-05-03
 Copyright (c) Oliver Friedmann
 MIT Software License.
 */
@@ -553,7 +553,7 @@ Scoped.binding("data", "global:BetaJS.Data");
 Scoped.define("module:", function () {
 	return {
 		guid: "9955100d-6a88-451f-9a85-004523eb8589",
-		version: '13.1427411488131'
+		version: '14.1430632920028'
 	};
 });
 
