@@ -553,7 +553,7 @@ Scoped.binding("data", "global:BetaJS.Data");
 Scoped.define("module:", function () {
 	return {
 		guid: "9955100d-6a88-451f-9a85-004523eb8589",
-		version: '14.1431040069960'
+		version: '15.1431040099491'
 	};
 });
 

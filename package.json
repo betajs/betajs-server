@@ -18,10 +18,25 @@
 		"grunt-node-qunit": "",
 		"grunt-contrib-jshint": "",
 		"grunt-wget": "",
-		"grunt-jsdoc": "beta"
+		"grunt-jsdoc": "beta",
+		"grunt-shell": "",
+		"grunt-template": ""
 	},
 	"repository": {
 		"type": "git",
 		"url": "git://github.com/betajs/betajs-server.git"
-	}
+	},
+	"meta": {
+		"status": "Active, Production ready",
+		"compatability": {
+			"NodeJS": "0.10 - Latest" 
+		},
+		"weakDependencies": {
+			"betajs-scoped": "https://github.com/betajs/betajs-scoped"
+		},
+		"dependencies": {
+			"betajs": "https://github.com/betajs/betajs",
+			"betajs-data": "https://github.com/betajs/betajs-data"
+		}
+	} 
 }
