@@ -553,7 +553,7 @@ Scoped.binding("data", "global:BetaJS.Data");
 Scoped.define("module:", function () {
 	return {
 		guid: "9955100d-6a88-451f-9a85-004523eb8589",
-		version: '15.1431040099491'
+		version: '17.1431044819839'
 	};
 });
 
@@ -1643,7 +1643,7 @@ Scoped.define("module:Databases.DatabaseTable", [
     	return  {
 			
 			constructor: function (database, table_name) {
-				inherited.call(this);
+				inherited.constructor.call(this);
 				this._database = database;
 				this._table_name = table_name;
 			},
@@ -1768,7 +1768,7 @@ Scoped.define("module:Databases.MongoDatabase", [
 		    },
 		
 		    mongo_object_id : function(id) {
-		        return this.mongo_module.ObjectID || this.mongo_module.BSONNative.ObjectID;
+		        return this.mongo_module.ObjectID;
 		    },
 		
 		    mongodb : function() {
@@ -1854,7 +1854,7 @@ Scoped.define("module:Databases.MongoDatabaseTable", [
 						result = result.skip(options.skip);
 					if ("limit" in options)
 						result = result.limit(options.limit);
-					return Promise.funcCallback(result, result.asArray).mapSuccess(function (cols) {
+					return Promise.funcCallback(result, result.toArray).mapSuccess(function (cols) {
 						return new ArrayIterator(cols);
 					}, this);
 				}, this);
@@ -1896,8 +1896,10 @@ Scoped.define("module:Databases.MongoDatabaseTable", [
 
 Scoped.define("module:Stores.DatabaseStore", [      
         "data:Stores.BaseStore",
-        "base:Objs"
-    ], function (BaseStore, Objs, scoped) {
+        "base:Objs",
+        "data:Queries",
+        "data:Queries.Constrained"
+    ], function (BaseStore, Objs, Queries, ConstrainedQueries, scoped) {
     return BaseStore.extend({scoped: scoped}, function (inherited) {
 		return {
 			
@@ -1942,12 +1944,7 @@ Scoped.define("module:Stores.DatabaseStore", [
 			},
 			
 			_query_capabilities: function () {
-				return {
-					"query": true,
-					"sort": true,
-					"skip": true,
-					"limit": true
-				};
+				return ConstrainedQueries.fullConstrainedQueryCapabilities(Queries.fullQueryCapabilities());
 			},
 			
 			_query: function (query, options) {

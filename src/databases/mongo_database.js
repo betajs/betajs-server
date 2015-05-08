@@ -32,7 +32,7 @@ Scoped.define("module:Databases.MongoDatabase", [
 		    },
 		
 		    mongo_object_id : function(id) {
-		        return this.mongo_module.ObjectID || this.mongo_module.BSONNative.ObjectID;
+		        return this.mongo_module.ObjectID;
 		    },
 		
 		    mongodb : function() {

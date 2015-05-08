@@ -6,7 +6,7 @@ Scoped.define("module:Databases.DatabaseTable", [
     	return  {
 			
 			constructor: function (database, table_name) {
-				inherited.call(this);
+				inherited.constructor.call(this);
 				this._database = database;
 				this._table_name = table_name;
 			},

@@ -1,7 +1,9 @@
 Scoped.define("module:Stores.DatabaseStore", [      
         "data:Stores.BaseStore",
-        "base:Objs"
-    ], function (BaseStore, Objs, scoped) {
+        "base:Objs",
+        "data:Queries",
+        "data:Queries.Constrained"
+    ], function (BaseStore, Objs, Queries, ConstrainedQueries, scoped) {
     return BaseStore.extend({scoped: scoped}, function (inherited) {
 		return {
 			
@@ -46,12 +48,7 @@ Scoped.define("module:Stores.DatabaseStore", [
 			},
 			
 			_query_capabilities: function () {
-				return {
-					"query": true,
-					"sort": true,
-					"skip": true,
-					"limit": true
-				};
+				return ConstrainedQueries.fullConstrainedQueryCapabilities(Queries.fullQueryCapabilities());
 			},
 			
 			_query: function (query, options) {
