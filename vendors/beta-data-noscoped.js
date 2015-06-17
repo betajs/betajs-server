@@ -1,5 +1,5 @@
 /*!
-betajs-data - v1.0.0 - 2015-05-03
+betajs-data - v1.0.0 - 2015-06-17
 Copyright (c) Oliver Friedmann
 MIT Software License.
 */
@@ -14,34 +14,34 @@ Scoped.binding("json", "global:JSON");
 Scoped.define("module:", function () {
 	return {
 		guid: "70ed7146-bb6d-4da4-97dc-5a8e2d23a23f",
-		version: '21.1430633248627'
+		version: '34.1434567668435'
 	};
 });
 
 Scoped.define("module:Queries.Constrained", [
-        "json:",
-        "module:Queries",
-        "base:Types",
-        "base:Objs",
-        "base:Tokens",
-        "base:Comparators"
-	], function (JSON, Queries, Types, Objs, Tokens, Comparators) {
+                                             "json:",
+                                             "module:Queries",
+                                             "base:Types",
+                                             "base:Objs",
+                                             "base:Tokens",
+                                             "base:Comparators"
+                                             ], function (JSON, Queries, Types, Objs, Tokens, Comparators) {
 	return {
-		
+
 		/*
 		 * 
 		 * { query: query, options: options }
 		 * 
 		 * options:
-		 * 	skip: int || 0
 		 *  limit: int || null
+		 *  skip: int || 0
 		 *  sort: {
 		 *    key1: 1 || -1,
 		 *    key2: 1 || -1
 		 *  }
 		 * 
 		 */
-		
+
 		rectify: function (constrainedQuery) {
 			var base = ("options" in constrainedQuery || "query" in constrainedQuery) ? constrainedQuery : { query: constrainedQuery};
 			return Objs.extend({
@@ -49,7 +49,7 @@ Scoped.define("module:Queries.Constrained", [
 				options: {}
 			}, base);
 		},
-		
+
 		skipValidate: function (options, capabilities) {
 			if ("skip" in options) {
 				if (capabilities)
@@ -57,7 +57,7 @@ Scoped.define("module:Queries.Constrained", [
 			}
 			return true;
 		},
-		
+
 		limitValidate: function (options, capabilities) {
 			if ("limit" in options) {
 				if (capabilities)
@@ -80,7 +80,7 @@ Scoped.define("module:Queries.Constrained", [
 			}
 			return true;
 		},
-		
+
 		constraintsValidate: function (options, capabilities) {
 			return Objs.all(["skip", "limit", "sort"], function (prop) {
 				return this[prop + "Validate"].call(this, options, capabilities);
@@ -91,16 +91,16 @@ Scoped.define("module:Queries.Constrained", [
 			constrainedQuery = this.rectify(constrainedQuery);
 			return this.constraintsValidate(constrainedQuery.options, capabilities) && Queries.validate(constrainedQuery.query, capabilities.query || {});
 		},
-		
+
 		fullConstrainedQueryCapabilities: function (queryCapabilties) {
 			return {
-				query: queryCapabilties,
+				query: queryCapabilties || Queries.fullQueryCapabilities(),
 				skip: true,
 				limit: true,
 				sort: true // can also be false OR a non-empty object containing keys which can be ordered by
 			};
 		},
-		
+
 		normalize: function (constrainedQuery) {
 			constrainedQuery = this.rectify(constrainedQuery);
 			return {
@@ -112,15 +112,15 @@ Scoped.define("module:Queries.Constrained", [
 		serialize: function (constrainedQuery) {
 			return JSON.stringify(this.rectify(constrainedQuery));
 		},
-		
+
 		unserialize: function (constrainedQuery) {
 			return JSON.parse(constrainedQuery);
 		},
-		
+
 		hash: function (constrainedQuery) {
 			return Tokens.simple_hash(this.serialize(constrainedQuery));
 		},
-		
+
 		subsumizes: function (constrainedQuery, constrainedQuery2) {
 			constrainedQuery = this.rectify(constrainedQuery);
 			constrainedQuery2 = this.rectify(constrainedQuery2);
@@ -142,7 +142,7 @@ Scoped.define("module:Queries.Constrained", [
 				return false;
 			return Queries.subsumizes(constrainedQuery.query, constrainedQuery2.query);
 		},
-		
+
 		mergeable: function (constrainedQuery, constrainedQuery2) {
 			constrainedQuery = this.rectify(constrainedQuery);
 			constrainedQuery2 = this.rectify(constrainedQuery2);
@@ -163,7 +163,7 @@ Scoped.define("module:Queries.Constrained", [
 			} else 
 				return !("skip" in qopts2) || (!qopts.limit || (qopts.limit >= qopts2.skip));
 		},
-		
+
 		merge: function (constrainedQuery, constrainedQuery2) {
 			constrainedQuery = this.rectify(constrainedQuery);
 			constrainedQuery2 = this.rectify(constrainedQuery2);
@@ -173,83 +173,83 @@ Scoped.define("module:Queries.Constrained", [
 				query: constrainedQuery.query,
 				options: {
 					skip: "skip" in qopts ? ("skip" in qopts2 ? Math.min(qopts.skip, qopts2.skip): null) : null,
-					limit: "limit" in qopts ? ("limit" in qopts2 ? Math.max(qopts.limit, qopts2.limit): null) : null,
-					sort: constrainedQuery.sort
+							limit: "limit" in qopts ? ("limit" in qopts2 ? Math.max(qopts.limit, qopts2.limit): null) : null,
+									sort: constrainedQuery.sort
 				}
 			};
 		}
-		
-		
+
+
 	}; 
 });
 Scoped.define("module:Queries", [
-        "json:",
-	    "base:Types",
-	    "base:Sort",
-	    "base:Objs",
-	    "base:Class",
-	    "base:Tokens",
-	    "base:Iterators.ArrayIterator",
-	    "base:Iterators.FilteredIterator",
-	    "base:Strings",
-	    "base:Comparators"
-	], function (JSON, Types, Sort, Objs, Class, Tokens, ArrayIterator, FilteredIterator, Strings, Comparators) {
-	
+                                 "json:",
+                                 "base:Types",
+                                 "base:Sort",
+                                 "base:Objs",
+                                 "base:Class",
+                                 "base:Tokens",
+                                 "base:Iterators.ArrayIterator",
+                                 "base:Iterators.FilteredIterator",
+                                 "base:Strings",
+                                 "base:Comparators"
+                                 ], function (JSON, Types, Sort, Objs, Class, Tokens, ArrayIterator, FilteredIterator, Strings, Comparators) {
+
 	var SYNTAX_PAIR_KEYS = {
-		"$or": {
-			evaluate_combine: Objs.exists
-		},
-		"$and": {
-			evaluate_combine: Objs.all
-		}
+			"$or": {
+				evaluate_combine: Objs.exists
+			},
+			"$and": {
+				evaluate_combine: Objs.all
+			}
 	};
-	
+
 	var SYNTAX_CONDITION_KEYS = {
-		"$in": {
-			target: "atoms",
-			evaluate_combine: Objs.exists,
-			evaluate_single: function (object_value, condition_value) {
-				return object_value === condition_value;
+			"$in": {
+				target: "atoms",
+				evaluate_combine: Objs.exists,
+				evaluate_single: function (object_value, condition_value) {
+					return object_value === condition_value;
+				}
+			}, "$gt": {
+				target: "atom",
+				evaluate_single: function (object_value, condition_value) {
+					return object_value > condition_value;
+				}
+			}, "$lt": {
+				target: "atom",
+				evaluate_single: function (object_value, condition_value) {
+					return object_value < condition_value;
+				}
+			}, "$gte": {
+				target: "atom",
+				evaluate_single: function (object_value, condition_value) {
+					return object_value >= condition_value;
+				}
+			}, "$le": {
+				target: "atom",
+				evaluate_single: function (object_value, condition_value) {
+					return object_value <= condition_value;
+				}
+			}, "$sw": {
+				target: "atom",
+				evaluate_single: function (object_value, condition_value) {
+					return object_value === condition_value || (Types.is_string(object_value) && object_value.indexOf(condition_value) === 0);
+				}
+			}, "$ct": {
+				target: "atom",
+				no_index_support: true,
+				evaluate_single: function (object_value, condition_value) {
+					return object_value === condition_value || (Types.is_string(object_value) && object_value.indexOf(condition_value) >= 0);
+				}
+			}, "$eq": {
+				target: "atom",
+				evaluate_single: function (object_value, condition_value) {
+					return object_value === condition_value;
+				}
 			}
-		}, "$gt": {
-			target: "atom",
-			evaluate_single: function (object_value, condition_value) {
-				return object_value > condition_value;
-			}
-		}, "$lt": {
-			target: "atom",
-			evaluate_single: function (object_value, condition_value) {
-				return object_value < condition_value;
-			}
-		}, "$gte": {
-			target: "atom",
-			evaluate_single: function (object_value, condition_value) {
-				return object_value >= condition_value;
-			}
-		}, "$le": {
-			target: "atom",
-			evaluate_single: function (object_value, condition_value) {
-				return object_value <= condition_value;
-			}
-		}, "$sw": {
-			target: "atom",
-			evaluate_single: function (object_value, condition_value) {
-				return object_value.indexOf(condition_value) === 0;
-			}
-		}, "$ct": {
-			target: "atom",
-			no_index_support: true,
-			evaluate_single: function (object_value, condition_value) {
-				return object_value.indexOf(condition_value) >= 0;
-			}
-		}, "$eq": {
-			target: "atom",
-			evaluate_single: function (object_value, condition_value) {
-				return object_value === condition_value;
-			}
-		}
 	};
-	
+
 	Objs.iter(Objs.clone(SYNTAX_CONDITION_KEYS, 1), function (value, key) {
 		var valueic = Objs.clone(value, 1);
 		valueic.evaluate_single = function (object_value, condition_value) {
@@ -258,10 +258,10 @@ Scoped.define("module:Queries", [
 		valueic.ignore_case = true;
 		SYNTAX_CONDITION_KEYS[key + "ic"] = valueic;
 	});
-	
-	
+
+
 	return {		
-		
+
 		/*
 		 * Syntax:
 		 *
@@ -275,35 +275,37 @@ Scoped.define("module:Queries", [
 		 * condition :== $in: atoms | $gt: atom | $lt: atom | $gte: atom | $le: atom | $sw: atom | $ct: atom | all with ic
 		 *
 		 */
-		
+
 		SYNTAX_PAIR_KEYS: SYNTAX_PAIR_KEYS,
 
 		SYNTAX_CONDITION_KEYS: SYNTAX_CONDITION_KEYS,
-		
+
 		validate: function (query, capabilities) {
 			return this.validate_query(query, capabilities);
 		},
-		
+
 		validate_atoms: function (atoms, capabilities) {
-			return Types.is_array(atoms) && Objs.all(atoms, this.validate_atom, this);
+			return Types.is_array(atoms) && Objs.all(atoms, function (atom) {
+				return this.validate_atom(atom, capabilities);
+			}, this);
 		},
-		
-		validate_atom: function (atom) {
-			return true; 
+
+		validate_atom: function (atom, capabilities) {
+			return !capabilities || !!capabilities.atom; 
 		},
-		
+
 		validate_queries: function (queries, capabilities) {
 			return Types.is_array(queries) && Objs.all(queries, function (query) {
 				return this.validate_query(query, capabilities);
 			}, this);
 		},
-		
+
 		validate_query: function (query, capabilities) {
 			return Types.is_object(query) && Objs.all(query, function (value, key) {
 				return this.validate_pair(value, key, capabilities);
 			}, this);
 		},
-		
+
 		validate_pair: function (value, key, capabilities) {
 			if (key in this.SYNTAX_PAIR_KEYS) {
 				if (capabilities && (!capabilities.bool || !(key in capabilities.bool)))
@@ -312,73 +314,73 @@ Scoped.define("module:Queries", [
 			}
 			return this.validate_value(value, capabilities);
 		},
-		
+
 		is_query_atom: function (value) {
 			return value === null || !Types.is_object(value) || Objs.all(value, function (v, key) {
-				return key in this.SYNTAX_CONDITION_KEYS;
+				return !(key in this.SYNTAX_CONDITION_KEYS);
 			}, this);
 		},
-		
+
 		validate_value: function (value, capabilities) {
-			return this.is_query_atom(value) ? this.validate_conditions(value, capabilities) : this.validate_atom(value);
+			return !this.is_query_atom(value) ? this.validate_conditions(value, capabilities) : this.validate_atom(value, capabilities);
 		},
-		
+
 		validate_conditions: function (conditions, capabilities) {
 			return Types.is_object(conditions) && Objs.all(conditions, function (value, key) {
 				return this.validate_condition(value, key, capabilities);
 			}, this);
 		},
-		
+
 		validate_condition: function (value, key, capabilities) {
 			if (capabilities && (!capabilities.conditions || !(key in capabilities.conditions)))
 				return false;
 			var meta = this.SYNTAX_CONDITION_KEYS[key];
 			return meta && (meta.target === "atoms" ? this.validate_atoms(value) : this.validate_atom(value));
 		},
-		
+
 		normalize: function (query) {
 			return Sort.deep_sort(query);
 		},
-		
+
 		serialize: function (query) {
 			return JSON.stringify(query);
 		},
-		
+
 		unserialize: function (query) {
 			return JSON.parse(query);
 		},
-		
+
 		hash: function (query) {
 			return Tokens.simple_hash(this.serialize(query));
 		},
-		
+
 		dependencies: function (query) {
 			return Objs.keys(this.dependencies_query(query, {}));
 		},
-		
+
 		dependencies_queries: function (queries, dep) {
 			Objs.iter(queries, function (query) {
 				dep = this.dependencies_query(query, dep);
 			}, this);
 			return dep;
 		},
-		
+
 		dependencies_query: function (query, dep) {
 			Objs.iter(query, function (value, key) {
 				dep = this.dependencies_pair(value, key, dep);
 			}, this);
 			return dep;
 		},
-		
+
 		dependencies_pair: function (value, key, dep) {
 			return key in this.SYNTAX_PAIR_KEYS ? this.dependencies_queries(value, dep) : this.dependencies_key(key, dep);
 		},
-		
+
 		dependencies_key: function (key, dep) {
 			dep[key] = (dep[key] || 0) + 1;
 			return dep;
 		},
-		
+
 		evaluate : function(query, object) {
 			return this.evaluate_query(query, object);
 		},
@@ -388,7 +390,7 @@ Scoped.define("module:Queries", [
 				return this.evaluate_pair(value, key, object);
 			}, this);
 		},
-		
+
 		evaluate_pair: function (value, key, object) {
 			if (key in this.SYNTAX_PAIR_KEYS) {
 				return this.SYNTAX_PAIR_KEYS[key].evaluate_combine.call(Objs, value, function (query) {
@@ -397,21 +399,21 @@ Scoped.define("module:Queries", [
 			} else
 				return this.evaluate_value(value, object[key]);
 		},
-		
+
 		evaluate_value: function (value, object_value) {
-			return Types.is_object(value) ? this.evaluate_conditions(value, object_value) : this.evaluate_atom(value, object_value);
+			return !this.is_query_atom(value) ? this.evaluate_conditions(value, object_value) : this.evaluate_atom(value, object_value);
 		},
-		
+
 		evaluate_atom: function (value, object_value) {
 			return value === object_value;
 		},
-		
+
 		evaluate_conditions: function (value, object_value) {
 			return Objs.all(value, function (condition_value, condition_key) {
 				return this.evaluate_condition(condition_value, condition_key, object_value);
 			}, this);
 		},
-		
+
 		evaluate_condition: function (condition_value, condition_key, object_value) {
 			var rec = this.SYNTAX_CONDITION_KEYS[condition_key];
 			if (rec.target === "atoms") {
@@ -421,7 +423,7 @@ Scoped.define("module:Queries", [
 			}
 			return rec.evaluate_single.call(this, object_value, condition_value);
 		},
-		
+
 		subsumizes: function (query, query2) {
 			// This is very simple at this point
 			if (!Types.is_object(query) || !Types.is_object)
@@ -432,7 +434,7 @@ Scoped.define("module:Queries", [
 			}
 			return true;
 		},
-		
+
 		fullQueryCapabilities: function () {
 			var bool = {};
 			Objs.iter(this.SYNTAX_PAIR_KEYS, function (dummy, key) {
@@ -443,11 +445,12 @@ Scoped.define("module:Queries", [
 				conditions[key] = true;
 			});
 			return {
+				atom: true,
 				bool: bool,
 				conditions: conditions
 			};
 		},
-		
+
 		mergeConditions: function (conditions1, conditions2) {
 			if (!Types.is_object(conditions1))
 				conditions1 = {"$eq": conditions1 };
@@ -492,7 +495,7 @@ Scoped.define("module:Queries", [
 				obj = {"$in": []};
 			return obj;
 		},
-		
+
 		disjunctiveNormalForm: function (query, mergeKeys) {
 			query = Objs.clone(query, 1);
 			var factors = [];
@@ -541,7 +544,7 @@ Scoped.define("module:Queries", [
 			helper(query, 0);
 			return {"$or": result};
 		},
-		
+
 		simplifyQuery: function (query) {
 			var result = {};
 			Objs.iter(query, function (value, key) {
@@ -565,7 +568,7 @@ Scoped.define("module:Queries", [
 			}, this);
 			return result;
 		},
-		
+
 		simplifyConditions: function (conditions) {
 			var result = {};
 			Objs.iter(["", "ic"], function (add) {
@@ -618,238 +621,28 @@ Scoped.define("module:Queries", [
 			}, this);
 			return result;
 		}
-		
+
 	}; 
 });
-Scoped.define("module:Collections.QueryCollection", [      
-        "base:Collections.Collection",
-        "base:Objs",
-        "base:Types",
-        "base:Promise"
-    ], function (Collection, Objs, Types, Promise, scoped) {
-    return Collection.extend({scoped: scoped}, function (inherited) {
-		return {
-			
-			constructor: function (source, query, options) {
-				this._source = source;
-				inherited.constructor.call(this, options);
-				this._options = Objs.extend({
-					forward_steps: null,
-					backward_steps: null,
-					range: null
-				}, options);
-				if (query !== null)
-					this.set_query(query);
-			},
-			
-			query: function () {
-				return this._query;
-			},
-			
-			set_query: function (query) {
-				this._query = Objs.extend({
-					query: {},
-					options: {}
-				}, query);
-				this._query.options.skip = this._query.options.skip || 0;
-				this._query.options.limit = this._query.options.limit || null;
-				this._query.options.sort = this._query.options.sort || {};  
-				this._count = 0;
-				return this.__execute_query(this._query.options.skip, this._query.options.limit, true);
-			},
-			
-			__sub_query: function (options) {
-				return this._source.query(this._query.query, options);
-			},
-			
-			__execute_query: function (skip, limit, clear_before) {
-				skip = Math.max(skip, 0);
-				var q = {};
-				if (this._query.options.sort && !Types.is_empty(this._query.options.sort))
-					q.sort = this._query.options.sort;
-				if (clear_before) {
-					if (skip > 0)
-						q.skip = skip;
-					if (limit !== null)
-						q.limit = limit;
-					return this.__sub_query(q).mapSuccess(function (iter) {
-						var objs = iter.asArray();
-						this._query.options.skip = skip;
-						this._query.options.limit = limit;
-						this._count = !limit || objs.length < limit ? skip + objs.length : null;
-						this.clear();
-						this.add_objects(objs);
-						return true;
-					}, this);
-				} else if (skip < this._query.options.skip) {
-					limit = this._query.options.skip - skip;
-					if (skip > 0)
-						q.skip = skip;
-					q.limit = limit;
-					return this.__sub_query(q).mapSuccess(function (iter) {
-						var objs = iter.asArray();
-						this._query.options.skip = skip;
-						var added = this.add_objects(objs);
-						this._query.options.limit = this._query.options.limit === null ? null : this._query.options.limit + added;
-						return true;
-					}, this);
-				} else if (skip >= this._query.options.skip) {
-					if (this._query.options.limit !== null && (!limit || skip + limit > this._query.options.skip + this._query.options.limit)) {
-						limit = (skip + limit) - (this._query.options.skip + this._query.options.limit);
-						skip = this._query.options.skip + this._query.options.limit;
-						if (skip > 0)
-							q.skip = skip;
-						if (limit)
-							q.limit = limit;
-						return this.__sub_query(q).mapSuccess(function (iter) {
-							var objs = iter.asArray();
-							var added = this.add_objects(objs);
-							this._query.options.limit = this._query.options.limit + added;
-							if (limit > objs.length)
-								this._count = skip + added;
-							return true;
-						}, this);
-					} else
-						return Promise.create(true);
-				}
-			},
-			
-			increase_forwards: function (steps) {
-				steps = !steps ? this._options.forward_steps : steps;
-				if (!steps || this._query.options.limit === null)
-					return Promise.create(true);
-				return this.__execute_query(this._query.options.skip + this._query.options.limit, steps, false);
-			},
-			
-			increase_backwards: function (steps) {
-				steps = !steps ? this._options.backward_steps : steps;
-				if (steps && this._query.options.skip > 0) {
-					steps = Math.min(steps, this._query.options.skip);
-					return this.__execute_query(this._query.options.skip - steps, steps, false);
-				} else
-					return Promise.create(true);
-			},
-			
-			paginate: function (index) {
-				return this.__execute_query(this._options.range * index, this._options.range, true);
-			},
-			
-			paginate_index: function () {
-				return !this._options.range ? null : Math.floor(this._query.options.skip / this._options.range);
-			},
-			
-			paginate_count: function () {
-				return !this._count || !this._options.range ? null : Math.ceil(this._count / this._options.range);
-			},
-			
-			next: function () {
-				var paginate_index = this.paginate_index();
-				if (!paginate_index)
-					return Promise.create(true);
-				var paginate_count = this.paginate_count();
-				if (!paginate_count || paginate_index < this.paginate_count() - 1)
-					return this.paginate(paginate_index + 1);
-				return Promise.create(true);
-			},
-			
-			prev: function () {
-				var paginate_index = this.paginate_index();
-				if (!paginate_index)
-					return Promise.create(true);
-				if (paginate_index > 0)
-					this.paginate(paginate_index - 1);
-				return Promise.create(true);
-			},
-			
-			isComplete: function () {
-				return this._count !== null;
-			}
-			
-    	};
-	});
-});
-	
-
-Scoped.define("module:Collections.ActiveQueryCollection", [      
-         "module:Collections.QueryCollection",
-         "module:Queries",
-         "base:Objs"
-     ], function (QueryCollection, Queries, Objs, scoped) {
-     return QueryCollection.extend({scoped: scoped}, function (inherited) {
- 		return {
-                                             			
-			constructor: function (source, query, options) {
-				inherited.constructor.call(this, source, query, options);
-				source.on("create", this.__active_create, this);
-				source.on("remove", this.__active_remove, this);
-				source.on("update", this.__active_update, this);
-			},
-			
-			destroy: function () {
-				this._source.off(null, null, this);
-				inherited.destroy.call(this);
-			},
-			
-			get_ident: function (obj) {
-				return obj.id();
-			},
-			
-			is_valid: function (data) {
-				return Queries.evaluate(this.query().query, data);
-			},
-			
-			__active_create: function (data, materialize) {
-				if (!this.is_valid(data))
-					return;
-				var obj = materialize();
-				this.add(obj);
-				this._count = this._count + 1;
-				if (this._query.options.limit !== null)
-					this._query.options.limit = this._query.options.limit + 1;
-			},
-			
-			__active_remove: function (id) {
-				var object = this.getById(id);
-				if (!object)
-					return;
-				this.remove(object);
-				this._count = this._count - 1;
-				if (this._query.options.limit !== null)
-					this._query.options.limit = this._query.options.limit - 1;
-			},
-			
-			__active_update: function (id, data, row) {
-				var object = this.getById(id);
-				var merged = Objs.extend(row, data);
-				if (!object)
-					this.__active_create(merged, this._source.materializer(merged));
-				else if (!this.is_valid(merged))
-					this.__active_remove(id);
-			}
-
-		};
-    });
-});
-
 Scoped.define("module:Queries.Engine", [
-        "module:Queries",
-        "module:Queries.Constrained",
-        "base:Strings",
-        "base:Types",
-        "base:Objs",
-        "base:Promise",
-        "base:Comparators",
-        "base:Iterators.SkipIterator",
-        "base:Iterators.LimitIterator",
-        "base:Iterators.SortedIterator",
-        "base:Iterators.FilteredIterator",
-        "base:Iterators.SortedOrIterator",
-        "base:Iterators.PartiallySortedIterator",
-        "base:Iterators.ArrayIterator",
-        "base:Iterators.LazyMultiArrayIterator"
-	], function (Queries, Constrained, Strings, Types, Objs, Promise, Comparators, SkipIterator, LimitIterator, SortedIterator, FilteredIterator, SortedOrIterator, PartiallySortedIterator, ArrayIterator, LazyMultiArrayIterator) {
+                                        "module:Queries",
+                                        "module:Queries.Constrained",
+                                        "base:Strings",
+                                        "base:Types",
+                                        "base:Objs",
+                                        "base:Promise",
+                                        "base:Comparators",
+                                        "base:Iterators.SkipIterator",
+                                        "base:Iterators.LimitIterator",
+                                        "base:Iterators.SortedIterator",
+                                        "base:Iterators.FilteredIterator",
+                                        "base:Iterators.SortedOrIterator",
+                                        "base:Iterators.PartiallySortedIterator",
+                                        "base:Iterators.ArrayIterator",
+                                        "base:Iterators.LazyMultiArrayIterator"
+                                        ], function (Queries, Constrained, Strings, Types, Objs, Promise, Comparators, SkipIterator, LimitIterator, SortedIterator, FilteredIterator, SortedOrIterator, PartiallySortedIterator, ArrayIterator, LazyMultiArrayIterator) {
 	return {
-		
+
 		indexQueryConditionsSize: function (conds, index, ignoreCase) {
 			var add = ignoreCase ? "ic" : "";
 			var postfix = ignoreCase ? "_ic" : "";
@@ -884,7 +677,7 @@ Scoped.define("module:Queries.Engine", [
 			}
 			return subSize;
 		},
-		
+
 		indexQuerySize: function (queryDNF, key, index) {
 			var acc = 0;
 			var info = index.info();
@@ -903,11 +696,11 @@ Scoped.define("module:Queries.Engine", [
 			}, this);
 			return acc;
 		},
-		
+
 		queryPartially: function (constrainedQuery, constrainedQueryCapabilities) {
 			var simplified = {
-				query: constrainedQuery.query,
-				options: {}
+					query: constrainedQuery.query,
+					options: {}
 			};
 			if (constrainedQuery.options.sort) {
 				var first = Objs.ithKey(constrainedQuery.options.sort, 0);
@@ -916,7 +709,7 @@ Scoped.define("module:Queries.Engine", [
 			}
 			return Constrained.validate(simplified, constrainedQueryCapabilities);
 		},
-		
+
 		compileQuery: function (constrainedQuery, constrainedQueryCapabilities, constrainedQueryFunction, constrainedQueryContext) {
 			constrainedQuery = Constrained.rectify(constrainedQuery);
 			var sorting_supported = Constrained.sortValidate(constrainedQuery.options, constrainedQueryCapabilities);
@@ -924,10 +717,10 @@ Scoped.define("module:Queries.Engine", [
 			var skip_supported = Constrained.skipValidate(constrainedQuery.options, constrainedQueryCapabilities);
 			var limit_supported = Constrained.limitValidate(constrainedQuery.options, constrainedQueryCapabilities);
 			var post_actions = {
-				skip: null,
-				limit: null,
-				filter: null,
-				sort: null
+					skip: null,
+					limit: null,
+					filter: null,
+					sort: null
 			};
 			if (!query_supported || !sorting_supported || !skip_supported) {
 				post_actions.skip = constrainedQuery.options.skip;
@@ -947,8 +740,9 @@ Scoped.define("module:Queries.Engine", [
 				post_actions.filter = constrainedQuery.query;
 				constrainedQuery.query = {};
 			}
-			var query_result = this._queryResultRectify(constrainedQueryFunction.call(constrainedQueryContext, constrainedQuery), false);
+			var query_result = constrainedQueryFunction.call(constrainedQueryContext, constrainedQuery);
 			return query_result.mapSuccess(function (iter) {
+				iter = this._queryResultRectify(iter, false);
 				if (post_actions.filter)
 					iter = new FilteredIterator(iter, function(row) {
 						return Queries.evaluate(post_actions.filter, row);
@@ -962,7 +756,7 @@ Scoped.define("module:Queries.Engine", [
 				return iter;
 			}, this);
 		},
-		
+
 		compileIndexQuery: function (constrainedDNFQuery, key, index) {
 			var fullQuery = Objs.exists(constrainedDNFQuery.query.$or, function (query) {
 				return !(key in query);
@@ -1057,7 +851,7 @@ Scoped.define("module:Queries.Engine", [
 				iter = new LimitIterator(iter, constrainedDNFQuery.options.limit);
 			return Promise.value(iter);
 		},
-		
+
 		compileIndexedQuery: function (constrainedQuery, constrainedQueryCapabilities, constrainedQueryFunction, constrainedQueryContext, indices) {
 			constrainedQuery = Constrained.rectify(constrainedQuery);
 			indices = indices || {};
@@ -1090,7 +884,7 @@ Scoped.define("module:Queries.Engine", [
 			else
 				return this.compileQuery(constrainedQuery, constrainedQueryCapabilities, constrainedQueryFunction, constrainedQueryContext);
 		},
-		
+
 		_queryResultRectify: function (result, materialize) {
 			result = result || [];
 			return Types.is_array(result) == materialize ? result : (materialize ? result.asArray() : new ArrayIterator(result)); 
@@ -1101,107 +895,32 @@ Scoped.define("module:Queries.Engine", [
 
 
 
-Scoped.define("module:Stores.AssocDumbStore", ["module:Stores.DumbStore"], function (DumbStore, scoped) {
-  	return DumbStore.extend({scoped: scoped}, {
-		
-		_read_key: function (key) {},
-		_write_key: function (key, value) {},
-		_remove_key: function (key) {},
-		
-		__read_id: function (key) {
-			var raw = this._read_key(key);
-			return raw ? parseInt(raw, 10) : null;
-		},
-		
-		_read_last_id: function () {
-			return this.__read_id("last_id");
-		},
-		
-		_write_last_id: function (id) {
-			this._write_key("last_id", id);
-		},
-	
-		_remove_last_id: function () {
-			this._remove_key("last_id");
-		},
-	
-		_read_first_id: function () {
-			return this.__read_id("first_id");
-		},
-		
-		_write_first_id: function (id) {
-			this._write_key("first_id", id);
-		},
-		
-		_remove_first_id: function () {
-			this._remove_key("first_id");
-		},
-	
-		_read_item: function (id) {
-			return this._read_key("item_" + id);
-		},
-	
-		_write_item: function (id, data) {
-			this._write_key("item_" + id, data);
-		},
-		
-		_remove_item: function (id) {
-			this._remove_key("item_" + id);
-		},
-		
-		_read_next_id: function (id) {
-			return this.__read_id("next_" + id);
-		},
-	
-		_write_next_id: function (id, next_id) {
-			this._write_key("next_" + id, next_id);
-		},
-		
-		_remove_next_id: function (id) {
-			this._remove_key("next_" + id);
-		},
-		
-		_read_prev_id: function (id) {
-			return this.__read_id("prev_" + id);
-		},
-	
-		_write_prev_id: function (id, prev_id) {
-			this._write_key("prev_" + id, prev_id);
-		},
-	
-		_remove_prev_id: function (id) {
-			this._remove_key("prev_" + id);
-		}
-
-  	});
-});
-
 Scoped.define("module:Stores.AssocStore", [
-          "module:Stores.BaseStore",
-          "base:Promise",
-          "base:Objs"
-  	], function (BaseStore, Promise, Objs, scoped) {
-  	return BaseStore.extend({scoped: scoped}, function (inherited) {			
-  		return {
+                                           "module:Stores.BaseStore",
+                                           "base:Promise",
+                                           "base:Objs"
+                                           ], function (BaseStore, Promise, Objs, scoped) {
+	return BaseStore.extend({scoped: scoped}, function (inherited) {			
+		return {
 
 			_read_key: function (key) {},
 			_write_key: function (key, value) {},
 			_remove_key: function (key) {},
 			_iterate: function () {},
-			
+
 			constructor: function (options) {
 				options = options || {};
 				options.create_ids = true;
 				inherited.constructor.call(this, options);
 			},
-			
+
 			_insert: function (data) {
 				return Promise.tryCatch(function () {
 					this._write_key(data[this._id_key], data);
 					return data;
 				}, this);
 			},
-			
+
 			_remove: function (id) {
 				return Promise.tryCatch(function () {
 					var row = this._read_key(id);
@@ -1210,218 +929,96 @@ Scoped.define("module:Stores.AssocStore", [
 					return row;
 				}, this);
 			},
-			
+
 			_get: function (id) {
 				return Promise.tryCatch(function () {
 					return this._read_key(id);
 				}, this);
 			},
-			
+
 			_update: function (id, data) {
 				return Promise.tryCatch(function () {
 					var row = this._read_key(id);
 					if (row) {
-					    if (this._id_key in data) {
-					        this._remove_key(id);
-			                id = data[this._id_key];
-			                delete data[this._id_key];
-					    }
+						if (this._id_key in data) {
+							this._remove_key(id);
+							id = data[this._id_key];
+							delete data[this._id_key];
+						}
 						Objs.extend(row, data);
 						this._write_key(id, row);
 					}
 					return row;
 				}, this);
 			},
-			
+
 			_query: function (query, options) {
 				return Promise.tryCatch(function () {
 					return this._iterate();
 				}, this);
 			}
 
-  		};
-  	});
+		};
+	});
 });
 
-Scoped.define("module:Stores.StoreException", ["base:Exceptions.Exception"], function (Exception, scoped) {
-	return Exception.extend({scoped: scoped}, {});
-});
+//Stores everything temporarily in the browser's memory
 
+Scoped.define("module:Stores.MemoryStore", [
+                                            "module:Stores.AssocStore",
+                                            "base:Iterators.ObjectValuesIterator"
+                                            ], function (AssocStore, ObjectValuesIterator, scoped) {
+	return AssocStore.extend({scoped: scoped}, function (inherited) {			
+		return {
 
-Scoped.define("module:Stores.ListenerStore", [
-         "base:Class",
-         "base:Events.EventsMixin"
- 	], function (Class, EventsMixin, scoped) {
- 	return Class.extend({scoped: scoped}, [EventsMixin, function (inherited) {			
- 		return {
- 			
-	 		constructor: function (options) {
-	 			inherited.constructor.call(this);
-				options = options || {};
-				this._id_key = options.id_key || "id";
-			},
-		
-			id_key: function () {
-				return this._id_key;
-			},
-			
-			_inserted: function (row, event_data) {
-				this.trigger("insert", row, event_data);		
-			},
-			
-			_removed: function (id, event_data) {
-				this.trigger("remove", id, event_data);		
-			},
-			
-			_updated: function (row, data, event_data) {
-				this.trigger("update", row, data, event_data);		
-			} 
-
- 		};
- 	}]);
-});
-
-
-Scoped.define("module:Stores.BaseStore", [
-          "module:Stores.ListenerStore",
-          "module:Stores.StoreException",
-          "module:Queries.Engine",
-          "module:Queries",
-          "base:Classes.TimedIdGenerator",
-          "base:Promise",
-          "base:Types",
-          "base:Objs"
-  	], function (ListenerStore, StoreException, QueryEngine, Queries, TimedIdGenerator, Promise, Types, Objs, scoped) {
-  	return ListenerStore.extend({scoped: scoped}, function (inherited) {			
-  		return {
-				
 			constructor: function (options) {
 				inherited.constructor.call(this, options);
-				options = options || {};
-				this._id_key = options.id_key || "id";
-				this._create_ids = options.create_ids || false;
-				if (this._create_ids)
-					this._id_generator = options.id_generator || this._auto_destroy(new TimedIdGenerator());
-				this._query_model = "query_model" in options ? options.query_model : null;
-				this.indices = {};
+				this.__data = {};
 			},
-			
-		    query_model: function () {
-		        if (arguments.length > 0)
-		            this._query_model = arguments[0];
-		        return this._query_model;
-		    },
-		    
-			_insert: function (data) {
-				return Promise.create(null, new StoreException("unsupported: insert"));
+
+			_read_key: function (key) {
+				return this.__data[key];
 			},
-			
-			_remove: function (id) {
-				return Promise.create(null, new StoreException("unsupported: remove"));
+
+			_write_key: function (key, value) {
+				this.__data[key] = value;
 			},
-			
-			_get: function (id) {
-				return Promise.create(null, new StoreException("unsupported: get"));
+
+			_remove_key: function (key) {
+				delete this.__data[key];
 			},
-			
-			_update: function (id, data) {
-				return Promise.create(null, new StoreException("unsupported: update"));
+
+			_iterate: function () {
+				return new ObjectValuesIterator(this.__data);
+			}
+
+		};
+	});
+});
+
+Scoped.define("module:Stores.BaseStore", [
+                                          "base:Class",
+                                          "base:Events.EventsMixin",
+                                          "module:Stores.ReadStoreMixin",
+                                          "module:Stores.WriteStoreMixin",
+                                          "base:Promise"
+                                          ], function (Class, EventsMixin, ReadStoreMixin, WriteStoreMixin, Promise, scoped) {
+	return Class.extend({scoped: scoped}, [EventsMixin, ReadStoreMixin, WriteStoreMixin, function (inherited) {			
+		return {
+
+			constructor: function (options) {
+				inherited.constructor.call(this);
+				this._initializeReadStore(options);
+				this._initializeWriteStore(options);
 			},
-			
-			_query_capabilities: function () {
-				return {};
-			},
-			
-			_query: function (query, options) {
-				return Promise.create(null, new StoreException("unsupported: query"));
-			},
-			
-			insert: function (data) {
-				var event_data = null;
-				if (Types.is_array(data)) {
-					event_data = data[1];
-					data = data[0];
-				}			
-				if (this._create_ids && !(this._id_key in data && data[this._id_key]))
-					data[this._id_key] = this._id_generator.generate();
-				return this._insert(data).success(function (row) {
-					this._inserted(row, event_data);
-				}, this);
-			},
-			
-			insert_all: function (data, query) {
-				var event_data = null;
-				if (arguments.length > 2)
-					event_data = arguments[2];
-				if (query && this._query_model) {
-					this.trigger("query_register", query);
-					this._query_model.register(query);
-				}
-				var promise = Promise.and();
-				for (var i = 0; i < data.length; ++i)
-					promise = promise.and(this.insert(event_data ? [data[i], event_data] : data[i]));
-				return promise.end();
-			},
-		
-			remove: function (id) {
-				var event_data = null;
-				if (Types.is_array(id)) {
-					event_data = id[1];
-					id = id[0];
-				}			
-				return this._remove(id).success(function () {
-					this._removed(id, event_data);
-				}, this);
-			},
-			
-			get: function (id) {
-				return this._get(id);
-			},
-			
-			update: function (id, data) {
-				var event_data = null;
-				if (Types.is_array(data)) {
-					event_data = data[1];
-					data = data[0];
-				}			
-				return this._update(id, data).success(function (row) {
-					this._updated(row, data, event_data);
-				}, this);
-			},
-			
-			query: function (query, options) {
-				query = Objs.clone(query, -1);
-				if (options) {
-					if (options.limit)
-						options.limit = parseInt(options.limit, 10);
-					if (options.skip)
-						options.skip = parseInt(options.skip, 10);
-				}
-				if (this._query_model) {
-				    var subsumizer = this._query_model.subsumizer_of({query: query, options: options});
-		    		if (!subsumizer) {
-		    			this.trigger("query_miss", {query: query, options: options});
-		    			return Promise.error(new StoreException("Cannot execute query"));
-		    		}
-		    		this.trigger("query_hit", {query: query, options: options}, subsumizer);
-				}
-				return QueryEngine.compileIndexedQuery(
-						{query: query, options: options || {}},
-						this._query_capabilities(),
-						function (constrainedQuery) {
-							return this._query(constrainedQuery.query, constrainedQuery.options);
-						},
-						this,
-						this.indices);
-			},
-			
+
 			_ensure_index: function (key) {
 			},
-			
+
 			ensure_index: function (key) {
 				return this._ensure_index(key);
 			},
-			
+
 			clear: function () {
 				return this.query().mapSuccess(function (iter) {
 					var promise = Promise.and();
@@ -1431,135 +1028,615 @@ Scoped.define("module:Stores.BaseStore", [
 					}
 					return promise;
 				}, this);
-			},
-			
-			perform: function (commit) {
-				var action = Objs.keyByIndex(commit);
-				var data = Objs.valueByIndex(commit);
-				if (action == "insert")
-					return this.insert(data);
-				else if (action == "remove")
-					return this.remove(data);
-				else if (action == "update")
-					return this.update(Objs.keyByIndex(data), Objs.valueByIndex(data));
-				else
-					return Promise.error(new StoreException("unsupported: perform " + action));
 			}
 
-  		};
-  	});
+		};
+	}]);
+});
+
+Scoped.define("module:Stores.ReadStoreMixin", [
+                                               "module:Queries.Engine",
+                                               "module:Stores.StoreException",                                               
+                                               "base:Promise",
+                                               "base:Objs"
+                                               ], function (QueryEngine, StoreException, Promise, Objs) {
+	return {
+
+		_initializeReadStore: function (options) {
+			options = options || {};
+			this.indices = {};
+			this._watcher = options.watcher || null;
+		},
+		
+		watcher: function () {
+			return this._watcher;
+		},
+
+		_get: function (id) {
+			return Promise.create(null, new StoreException("unsupported: get"));
+		},
+
+		_query_capabilities: function () {
+			return {};
+		},
+
+		_query: function (query, options) {
+			return Promise.create(null, new StoreException("unsupported: query"));
+		},
+
+		get: function (id) {
+			return this._get(id);
+		},
+
+		query: function (query, options) {
+			query = Objs.clone(query, -1);
+			options = Objs.clone(options, -1);
+			if (options) {
+				if (options.limit)
+					options.limit = parseInt(options.limit, 10);
+				if (options.skip)
+					options.skip = parseInt(options.skip, 10);
+			}
+			return QueryEngine.compileIndexedQuery(
+					{query: query, options: options || {}},
+					this._query_capabilities(),
+					function (constrainedQuery) {
+						return this._query(constrainedQuery.query, constrainedQuery.options);
+					},
+					this,
+					this.indices);
+		}
+
+	};
 });
 
 
-Scoped.define("module:Stores.ConversionStore", [
-          "module:Stores.BaseStore",
-          "base:Objs",
-          "base:Iterators.MappedIterator"
-  	], function (BaseStore, Objs, MappedIterator, scoped) {
-  	return BaseStore.extend({scoped: scoped}, function (inherited) {			
-  		return {
+Scoped.define("module:Stores.ReadStore", [
+                                          "base:Class",
+                                          "module:Stores.ReadStoreMixin"
+                                          ], function (Class, ReadStoreMixin, scoped) {
+	return Class.extend({scoped: scoped}, [ReadStoreMixin, function (inherited) {			
+		return {
+
+			constructor: function (options) {
+				inherited.constructor.call(this);
+				this._initializeReadStore(options);
+			}
+
+		};
+	}]);
+});
+
+
+Scoped.define("module:Stores.StoreException", ["base:Exceptions.Exception"], function (Exception, scoped) {
+	return Exception.extend({scoped: scoped}, {});
+});
+
+Scoped.define("module:Stores.StoreHistory", [
+                                             "base:Class",
+                                             "base:Objs",
+                                             "base:Types",
+                                             "module:Stores.MemoryStore"
+                                             ], function (Class, Objs, Types, MemoryStore, scoped) {
+	return Class.extend({scoped: scoped}, function (inherited) {
+		return {
+
+			constructor: function (sourceStore, historyStore, options) {
+				inherited.constructor.call(this);
+				this._options = Objs.extend({
+					combine_update_update: false,
+					combine_insert_update: false,
+					combine_insert_remove: false,
+					combine_update_remove: false,
+					source_id_key: sourceStore ? sourceStore.id_key() : "id",
+							row_data: {},
+							filter_data: {}
+				}, options);
+				this.historyStore = historyStore || new MemoryStore();
+				this.commitId = 1;
+				if (sourceStore) {
+					sourceStore.on("insert", this.sourceInsert, this);
+					sourceStore.on("remove", this.sourceRemove, this);
+					sourceStore.on("update", this.sourceUpdate, this);
+				}
+			},
+
+			sourceInsert: function (data) {
+				this.commitId++;
+				this.historyStore.insert(Objs.extend({
+					row: data,
+					type: "insert",
+					row_id: data[this._options.source_id_key],
+					commit_id: this.commitId
+				}, this._options.row_data));
+			},
+
+			sourceUpdate: function (row, data) {
+				this.commitId++;
+				var row_id = Types.is_object(row) ? row[this._options.source_id_key] : row;
+				var target_type = "update";
+				if (this._options.combine_insert_update || this._options.combine_update_update) {
+					var types = [];
+					if (this._options.combine_insert_update)
+						types.push("insert");
+					if (this._options.combine_update_update)
+						types.push("update");
+					var combined_data = {};
+					var delete_ids = [];
+					var iter = this.historyStore.query(Objs.extend({
+						type: {"$or": types},
+						row_id: row_id
+					}, this._options.filter_data), {sort: {commit_id: 1}}).value();
+					while (iter.hasNext()) {
+						var itemData = iter.next();
+						if (itemData.type === "insert")
+							target_type = "insert";
+						combined_data = Objs.extend(combined_data, itemData.row);
+						delete_ids.push(this.historyStore.id_of(itemData));
+					}
+					data = Objs.extend(combined_data, data);
+					Objs.iter(delete_ids, this.historyStore.remove, this.historyStore);
+				}
+				this.historyStore.insert(Objs.extend({
+					row: data,
+					type: target_type,
+					row_id: row_id,
+					commit_id: this.commitId
+				}, this._options.row_data));
+			},
+
+			sourceRemove: function (id) {
+				this.commitId++;
+				if (this._options.combine_insert_remove) {
+					if (this.historyStore.query(Objs.extend({
+						type: "insert",
+						row_id: id
+					}, this._options.filter_data)).value().hasNext()) {
+						var iter = this.historyStore.query(Objs.extend({
+							row_id: id
+						}, this._options.filter_data)).value();
+						while (iter.hasNext())
+							this.historyStore.remove(this.historyStore.id_of(iter.next()));
+						return;
+					}
+				}
+				if (this._options.combine_update_remove) {
+					var iter2 = this.historyStore.query(Objs.extend({
+						type: "update",
+						row_id: id
+					}, this._options.filter_data)).value();
+					while (iter2.hasNext())
+						this.historyStore.remove(this.historyStore.id_of(iter2.next()));
+				}
+				this.historyStore.insert(Objs.extend({
+					type: "remove",
+					row_id: id,
+					commit_id: this.commitId
+				}, this._options.row_data));
+			}
+
+		};
+	});
+});
+
+Scoped.define("module:Stores.WriteStoreMixin", [
+                                                "module:Stores.StoreException",                                               
+                                                "base:Promise",
+                                                "base:IdGenerators.TimedIdGenerator",
+                                                "base:Types"
+                                                ], function (StoreException, Promise, TimedIdGenerator, Types) {
+	return {
+
+		_initializeWriteStore: function (options) {
+			options = options || {};
+			this._id_key = options.id_key || "id";
+			this._create_ids = options.create_ids || false;
+			if (this._create_ids)
+				this._id_generator = options.id_generator || this._auto_destroy(new TimedIdGenerator());
+		},
+
+		id_key: function () {
+			return this._id_key;
+		},
+
+		id_of: function (row) {
+			return row[this.id_key()];
+		},
+
+		_inserted: function (row) {
+			this.trigger("insert", row);		
+			this.trigger("write", "insert", row);
+		},
+
+		_removed: function (id) {
+			this.trigger("remove", id);
+			this.trigger("write", "remove", id);
+		},
+
+		_updated: function (row, data) {
+			this.trigger("update", row, data);	
+			this.trigger("write", "update", row, data);
+		}, 
+
+		insert_all: function (data, query) {
+			var promise = Promise.and();
+			for (var i = 0; i < data.length; ++i)
+				promise = promise.and(this.insert(data[i]));
+			return promise.end();
+		},
+
+		_insert: function (data) {
+			return Promise.create(null, new StoreException("unsupported: insert"));
+		},
+
+		_remove: function (id) {
+			return Promise.create(null, new StoreException("unsupported: remove"));
+		},
+
+		_update: function (id, data) {
+			return Promise.create(null, new StoreException("unsupported: update"));
+		},
+
+		insert: function (data) {
+			if (!data)
+				return Promise.create(null, new StoreException("empty insert"));
+			if (this._create_ids && !(this._id_key in data && data[this._id_key]))
+				data[this._id_key] = this._id_generator.generate();
+			return this._insert(data).success(function (row) {
+				this._inserted(row);
+			}, this);
+		},
+
+		remove: function (id) {
+			return this._remove(id).success(function () {
+				this._removed(id);
+			}, this);
+		},
+
+		update: function (id, data) {
+			return this._update(id, data).success(function (row) {
+				this._updated(row, data);
+			}, this);
+		}
+
+	};
+});
+
+
+Scoped.define("module:Stores.WriteStore", [
+                                           "base:Class",
+                                           "base:Events.EventsMixin",
+                                           "module:Stores.WriteStoreMixin"
+                                           ], function (Class, EventsMixin, WriteStoreMixin, scoped) {
+	return Class.extend({scoped: scoped}, [EventsMixin, WriteStoreMixin, function (inherited) {			
+		return {
+
+			constructor: function (options) {
+				inherited.constructor.call(this);
+				this._initializeWriteStore(options);
+			},
+
+			_ensure_index: function (key) {
+			},
+
+			ensure_index: function (key) {
+				return this._ensure_index(key);
+			}
+
+		};
+	}]);
+});
+
+
+Scoped.define("module:Stores.PassthroughStore", [
+                                                 "module:Stores.BaseStore",
+                                                 "base:Promise"
+                                                 ], function (BaseStore, Promise, scoped) {
+	return BaseStore.extend({scoped: scoped}, function (inherited) {			
+		return {
 
 			constructor: function (store, options) {
-				options = options || {};
-				options.id_key = store._id_key;
-				inherited.constructor.call(this, options);
 				this.__store = store;
-				this.__key_encoding = options.key_encoding || {};
-				this.__key_decoding = options.key_decoding || {};
-				this.__value_encoding = options.value_encoding || {};
-				this.__value_decoding = options.value_decoding || {};
-				this.__projection = options.projection || {};
+				options = options || {};
+				options.id_key = store.id_key();
+				inherited.constructor.call(this, options);
+				if (options.destroy_store)
+					this._auto_destroy(store);
 			},
-			
-			store: function () {
-				return this.__store;
-			},
-			
-			encode_object: function (obj) {
-				if (!obj)
-					return null;
-				var result = {};
-				for (var key in obj) {
-				    var encoded_key = this.encode_key(key);
-				    if (encoded_key)
-					    result[encoded_key] = this.encode_value(key, obj[key]);
-				}
-				return Objs.extend(result, this.__projection);
-			},
-			
-			decode_object: function (obj) {
-				if (!obj)
-					return null;
-				var result = {};
-				for (var key in obj) {
-				    var decoded_key = this.decode_key(key);
-				    if (decoded_key)
-					    result[decoded_key] = this.decode_value(key, obj[key]);
-			    }
-				for (key in this.__projection)
-					delete result[key];
-				return result;
-			},
-			
-			encode_key: function (key) {
-				return key in this.__key_encoding ? this.__key_encoding[key] : key;
-			},
-			
-			decode_key: function (key) {
-				return key in this.__key_decoding ? this.__key_decoding[key] : key;
-			},
-			
-			encode_value: function (key, value) {
-				return key in this.__value_encoding ? this.__value_encoding[key](value) : value;
-			},
-			
-			decode_value: function (key, value) {
-				return key in this.__value_decoding ? this.__value_decoding[key](value) : value;
-			},	
-		
+
 			_query_capabilities: function () {
 				return this.__store._query_capabilities();
 			},
-			
+
+			_insert: function (data) {
+				return this._preInsert(data).mapSuccess(function (data) {
+					return this.__store.insert(data).mapSuccess(function (data) {
+						return this._postInsert(data);
+					}, this);
+				}, this);
+			},
+
+			_remove: function (id) {
+				return this._preRemove().mapSuccess(function (id) {
+					return this.__store.remove(id).mapSuccess(function () {
+						return this._postRemove(id);
+					}, this);
+				}, this);
+			},
+
+			_get: function (id) {
+				return this._preGet(id).mapSuccess(function (id) {
+					return this.__store.get(id).mapSuccess(function (data) {
+						return this._postGet(data);
+					}, this);
+				}, this);
+			},
+
+			_update: function (id, data) {
+				return this._preUpdate(id, data).mapSuccess(function (args) {
+					return this.__store.update(args.id, args.data).mapSuccess(function (row) {
+						return this._postUpdate(row);
+					}, this);
+				}, this);
+			},
+
+			_query: function (query, options) {
+				return this._preQuery(query, options).mapSuccess(function (args) {
+					return this.__store.query(args.query, args.options).mapSuccess(function (results) {
+						return this._postQuery(results);
+					}, this);
+				}, this);
+			},
+
 			_ensure_index: function (key) {
 				return this.__store.ensure_index(key);
 			},
-			
-			_insert: function (data) {
-				return this.__store.insert(this.encode_object(data)).mapSuccess(this.decode_object, this);
-			},
-			
-			_remove: function (id) {
-				return this.__store.remove(this.encode_value(this._id_key, id));
-			},
-		
-			_get: function (id) {
-				return this.__store.get(this.encode_value(this._id_key, id)).mapSuccess(this.decode_object, this);
-			},
-			
-			_update: function (id, data) {
-				return this.__store.update(this.encode_value(this._id_key, id), this.encode_object(data)).mapSuccess(this.decode_object, this);
-			},
-			
-			_query: function (query, options) {
-				return this.__store.query(this.encode_object(query), options).mapSuccess(function (result) {
-					return new MappedIterator(result, this.decode_object, this);
-				}, this);
-			}		
 
-  		};
-  	});
+			_store: function () {
+				return this.__store;
+			},
+
+			_preInsert: function (data) {
+				return Promise.create(data);
+			},
+			
+			_postInsert: function (data) {
+				return Promise.create(data);
+			},
+			
+			_preRemove: function (id) {
+				return Promise.create(id);
+			},
+			
+			_postRemove: function (id) {
+				return Promise.create(true);
+			},
+			
+			_preGet: function (id) {
+				return Promise.create(id);
+			},
+			
+			_postGet: function (data) {
+				return Promise.create(data);
+			},
+
+			_preUpdate: function (id, data) {
+				return Promise.create({id: id, data: data});
+			},
+			
+			_postUpdate: function (row) {
+				return Promise.create(row);
+			},
+			
+			_preQuery: function (query, options) {
+				return Promise.create({query: query, options: options});
+			},
+			
+			_postQuery: function (results) {
+				return Promise.create(results);
+			}
+
+		};
+	});
+});
+
+
+Scoped.define("module:Stores.SimulatorStore", [
+                                               "module:Stores.PassthroughStore",
+                                               "base:Promise"
+                                               ], function (BaseStore, Promise, scoped) {
+	return BaseStore.extend({scoped: scoped}, function (inherited) {			
+		return {
+			
+			online: true,
+
+			_preInsert: function () {
+				return this.online ? inherited._preInsert.apply(this, arguments) : Promise.error("Offline");
+			},
+			
+			_preRemove: function () {
+				return this.online ? inherited._preRemove.apply(this, arguments) : Promise.error("Offline");
+			},
+			
+			_preGet: function () {
+				return this.online ? inherited._preGet.apply(this, arguments) : Promise.error("Offline");
+			},
+			
+			_preUpdate: function () {
+				return this.online ? inherited._preUpdate.apply(this, arguments) : Promise.error("Offline");
+			},
+			
+			_preQuery: function () {
+				return this.online ? inherited._preQuery.apply(this, arguments) : Promise.error("Offline");
+			}
+			
+		};
+	});
+});
+
+
+Scoped.define("module:Stores.TransformationStore", [
+                                                 "module:Stores.PassthroughStore",
+                                                 "base:Iterators.MappedIterator",
+                                                 "base:Objs"
+                                                 ], function (PassthroughStore, MappedIterator, Objs, scoped) {
+	return PassthroughStore.extend({scoped: scoped}, function (inherited) {			
+		return {
+			
+			_encodeData: function (data) {
+				return data;
+			},
+			
+			_decodeData: function (data) {
+				return data;
+			},
+			
+			_encodeId: function (id) {
+				return this.id_of(this._encodeData(Objs.objectBy(this.id_key(), id)));
+			},
+			
+			_decodeId: function (id) {
+				return this.id_of(this._decodeData(Objs.objectBy(this.id_key(), id)));
+			},
+			
+			_encodeQuery: function (query, options) {
+				// Usually needs better encoding
+				return {
+					query: query,
+					options: options
+				};
+			},
+
+			_preInsert: function (data) {
+				return Promise.create(this._encodeData(data));
+			},
+			
+			_postInsert: function (data) {
+				return Promise.create(this._decodeData(data));
+			},
+			
+			_preRemove: function (id) {
+				return Promise.create(this._encodeId(id));
+			},
+			
+			_postRemove: function (id) {
+				return Promise.create(true);
+			},
+			
+			_preGet: function (id) {
+				return Promise.create(this._encodeId(id));
+			},
+			
+			_postGet: function (data) {
+				return Promise.create(this._decodeData(data));
+			},
+
+			_preUpdate: function (id, data) {
+				return Promise.create({id: this._encodeId(id), data: this._encodeData(data)});
+			},
+			
+			_postUpdate: function (row) {
+				return Promise.create(this._decodeData(row));
+			},
+			
+			_preQuery: function (query, options) {
+				return Promise.create(this._encodeQuery(query, options));
+			},
+			
+			_postQuery: function (results) {
+				return Promise.create(new MappedIterator(results, function (data) {
+					return this._decodeData(data);
+				}, this));
+			}
+
+		};
+	});
+});
+
+Scoped.define("module:Stores.AssocDumbStore", ["module:Stores.DumbStore"], function (DumbStore, scoped) {
+	return DumbStore.extend({scoped: scoped}, {
+
+		_read_key: function (key) {},
+		_write_key: function (key, value) {},
+		_remove_key: function (key) {},
+
+		__read_id: function (key) {
+			var raw = this._read_key(key);
+			return raw ? parseInt(raw, 10) : null;
+		},
+
+		_read_last_id: function () {
+			return this.__read_id("last_id");
+		},
+
+		_write_last_id: function (id) {
+			this._write_key("last_id", id);
+		},
+
+		_remove_last_id: function () {
+			this._remove_key("last_id");
+		},
+
+		_read_first_id: function () {
+			return this.__read_id("first_id");
+		},
+
+		_write_first_id: function (id) {
+			this._write_key("first_id", id);
+		},
+
+		_remove_first_id: function () {
+			this._remove_key("first_id");
+		},
+
+		_read_item: function (id) {
+			return this._read_key("item_" + id);
+		},
+
+		_write_item: function (id, data) {
+			this._write_key("item_" + id, data);
+		},
+
+		_remove_item: function (id) {
+			this._remove_key("item_" + id);
+		},
+
+		_read_next_id: function (id) {
+			return this.__read_id("next_" + id);
+		},
+
+		_write_next_id: function (id, next_id) {
+			this._write_key("next_" + id, next_id);
+		},
+
+		_remove_next_id: function (id) {
+			this._remove_key("next_" + id);
+		},
+
+		_read_prev_id: function (id) {
+			return this.__read_id("prev_" + id);
+		},
+
+		_write_prev_id: function (id, prev_id) {
+			this._write_key("prev_" + id, prev_id);
+		},
+
+		_remove_prev_id: function (id) {
+			this._remove_key("prev_" + id);
+		}
+
+	});
 });
 
 Scoped.define("module:Stores.DumbStore", [
-          "module:Stores.BaseStore",
-          "base:Promise",
-          "base:Objs",
-          "base:Iterators.Iterator"
-  	], function (BaseStore, Promise, Objs, Iterator, scoped) {
-  	return BaseStore.extend({scoped: scoped}, function (inherited) {			
-  		return {
-			
+                                          "module:Stores.BaseStore",
+                                          "base:Promise",
+                                          "base:Objs",
+                                          "base:Iterators.Iterator"
+                                          ], function (BaseStore, Promise, Objs, Iterator, scoped) {
+	return BaseStore.extend({scoped: scoped}, function (inherited) {			
+		return {
+
 			_read_last_id: function () {},
 			_write_last_id: function (id) {},
 			_remove_last_id: function () {},
@@ -1575,13 +1652,13 @@ Scoped.define("module:Stores.DumbStore", [
 			_read_prev_id: function (id) {},
 			_write_prev_id: function (id, prev_id) {},
 			_remove_prev_id: function (id) {},
-			
+
 			constructor: function (options) {
 				options = options || {};
 				options.create_ids = true;
 				inherited.constructor.call(this, options);
 			},
-		
+
 			_insert: function (data) {
 				return Promise.tryCatch(function () {
 					var last_id = this._read_last_id();
@@ -1596,7 +1673,7 @@ Scoped.define("module:Stores.DumbStore", [
 					return data;
 				}, this);
 			},
-			
+
 			_remove: function (id) {
 				return Promise.tryCatch(function () {
 					var row = this._read_item(id);
@@ -1625,13 +1702,13 @@ Scoped.define("module:Stores.DumbStore", [
 					return row;
 				}, this);
 			},
-			
+
 			_get: function (id) {
 				return Promise.tryCatch(function () {
 					return this._read_item(id);
 				}, this);
 			},
-			
+
 			_update: function (id, data) {
 				return Promise.tryCatch(function () {
 					var row = this._get(id);
@@ -1643,7 +1720,7 @@ Scoped.define("module:Stores.DumbStore", [
 					return row;
 				}, this);
 			},
-			
+
 			_query: function (query, options) {
 				return Promise.tryCatch(function () {
 					var iter = new Iterator();
@@ -1651,213 +1728,914 @@ Scoped.define("module:Stores.DumbStore", [
 					var fid = this._read_first_id();
 					Objs.extend(iter, {
 						__id: fid === null ? 1 : fid,
-						__store: store,
-						__query: query,
-						
-						hasNext: function () {
-							var last_id = this.__store._read_last_id();
-							if (last_id === null)
-								return false;
-							while (this.__id < last_id && !this.__store._read_item(this.__id))
-								this.__id++;
-							return this.__id <= last_id;
-						},
-						
-						next: function () {
-							if (this.hasNext()) {
-								var item = this.__store.get(this.__id);
-								if (this.__id == this.__store._read_last_id())
-									this.__id++;
-								else
-									this.__id = this.__store._read_next_id(this.__id);
-								return item;
-							}
-							return null;
-						}
+								__store: store,
+								__query: query,
+
+								hasNext: function () {
+									var last_id = this.__store._read_last_id();
+									if (last_id === null)
+										return false;
+									while (this.__id < last_id && !this.__store._read_item(this.__id))
+										this.__id++;
+									return this.__id <= last_id;
+								},
+
+								next: function () {
+									if (this.hasNext()) {
+										var item = this.__store.get(this.__id);
+										if (this.__id == this.__store._read_last_id())
+											this.__id++;
+										else
+											this.__id = this.__store._read_next_id(this.__id);
+										return item;
+									}
+									return null;
+								}
 					});
 					return iter;
 				}, this);
 			}	
 
-  		};
-  	});
+		};
+	});
 });
 
-// Stores everything permanently in the browser's local storage
+//Stores everything permanently in the browser's local storage
 
 Scoped.define("module:Stores.LocalStore", [
-          "module:Stores.AssocDumbStore",
-          "json:"
-  	], function (AssocDumbStore, JSON, scoped) {
-  	return AssocDumbStore.extend({scoped: scoped}, function (inherited) {			
-  		return {
+                                           "module:Stores.AssocDumbStore",
+                                           "json:"
+                                           ], function (AssocDumbStore, JSON, scoped) {
+	return AssocDumbStore.extend({scoped: scoped}, function (inherited) {			
+		return {
 
 			constructor: function (options, localStorage) {
 				inherited.constructor.call(this, options);
 				this.__prefix = options.prefix;
 				this.__localStorage = localStorage;
 			},
-			
+
 			__key: function (key) {
 				return this.__prefix + key;
 			},
-			
+
 			_read_key: function (key) {
 				var prfkey = this.__key(key);
 				return prfkey in this.__localStorage ? JSON.parse(this.__localStorage[prfkey]) : null;
 			},
-			
+
 			_write_key: function (key, value) {
 				this.__localStorage[this.__key(key)] = JSON.stringify(value);
 			},
-			
+
 			_remove_key: function (key) {
 				delete this.__localStorage[this.__key(key)];
 			}
 
-  		};
-  	});
+		};
+	});
 });
 
-// Stores everything temporarily in the browser's memory
 
-Scoped.define("module:Stores.MemoryStore", [
-          "module:Stores.AssocStore",
-          "base:Iterators.ObjectValuesIterator"
-  	], function (AssocStore, ObjectValuesIterator, scoped) {
-  	return AssocStore.extend({scoped: scoped}, function (inherited) {			
-  		return {
-			
-			constructor: function (options) {
-				inherited.constructor.call(this, options);
-				this.__data = {};
+Scoped.define("module:Stores.CachedStore", [
+                                            "module:Stores.BaseStore",
+                                            "module:Stores.MemoryStore",
+                                            "module:Queries.Constrained",
+                                            "module:Stores.CacheStrategies.ExpiryCacheStrategy",
+                                            "base:Promise",
+                                            "base:Objs",
+                                            "base:Types",
+                                            "base:Iterators.ArrayIterator",
+                                            "base:Iterators.MappedIterator",
+                                            "base:Timers.Timer"
+                                            ], function (Store, MemoryStore, Constrained, ExpiryCacheStrategy, Promise, Objs, Types, ArrayIterator, MappedIterator, Timer, scoped) {
+	return Store.extend({scoped: scoped}, function (inherited) {			
+		return {
+
+			constructor: function (remoteStore, options) {
+				inherited.constructor.call(this);
+				this._options = Objs.extend({
+					itemMetaKey: "meta",
+					queryMetaKey: "meta",
+					queryKey: "query"
+				}, options);
+				this.remoteStore = remoteStore;
+				this._online = true;
+				this.itemCache = this._options.itemCache || this.auto_destroy(new MemoryStore());
+				this.queryCache = this._options.queryCache || this.auto_destroy(new MemoryStore());
+				this.cacheStrategy = this._options.cacheStrategy || this.auto_destroy(new ExpiryCacheStrategy());
+				if (this._options.auto_cleanup) {
+					this.auto_destroy(new Timer({
+						fire: this.cleanup,
+						context: this,
+						start: true,
+						delay: this._options.auto_cleanup
+					}));
+				}
 			},
-		
-			_read_key: function (key) {
-				return this.__data[key];
+
+			_query_capabilities: function () {
+				return Constrained.fullConstrainedQueryCapabilities();
+			},
+
+			_insert: function (data) {
+				return this.cacheInsert(data, {
+					lockItem: true,
+					silent: true,
+					refreshMeta: false,
+					accessMeta: true
+				});
+			},
+
+			_update: function (id, data) {
+				return this.cacheUpdate(id, data, {
+					ignoreLock: false,
+					silent: true,
+					lockAttrs: true,
+					refreshMeta: false,
+					accessMeta: true
+				});
+			},
+
+			_remove: function (id) {
+				return this.cacheRemove(id, {
+					ignoreLock: true,
+					silent: true					
+				});
+			},
+
+			_get: function (id) {
+				return this.cacheGet(id, {
+					silentInsert: true,
+					silentUpdate: true,
+					silentRemove: true,
+					refreshMeta: true,
+					accessMeta: true
+				});
+			},
+
+			_query: function (query, options) {
+				return this.cacheQuery(query, options, {
+					silent: true,
+					queryRefreshMeta: true,
+					queryAccessMeta: true,
+					refreshMeta: true,
+					accessMeta: true
+				});
+			},			
+
+			/*
+			 * options:
+			 *   - lockItem: boolean
+			 *   - silent: boolean
+			 *   - refreshMeta: boolean
+			 *   - accessMeta: boolean
+			 */
+
+			cacheInsert: function (data, options) {
+				var meta = {
+						lockedItem: options.lockItem,
+						lockedAttrs: {},
+						refreshMeta: options.refreshMeta ? this.cacheStrategy.itemRefreshMeta() : null,
+								accessMeta: options.accessMeta ? this.cacheStrategy.itemAccessMeta() : null
+				};
+				return this.itemCache.insert(this.addItemMeta(data, meta)).mapSuccess(function (result) {
+					data = this.removeItemMeta(result);
+					if (!options.silent)
+						this._inserted(data);
+					return data;
+				}, this);
+			},
+
+			/*
+			 * options:
+			 *   - ignoreLock: boolean
+			 *   - lockAttrs: boolean
+			 *   - silent: boolean
+			 *   - accessMeta: boolean
+			 *   - refreshMeta: boolean
+			 */
+
+			cacheUpdate: function (id, data, options) {
+				return this.itemCache.get(id).mapSuccess(function (item) {
+					if (!item)
+						return null;
+					var meta = this.readItemMeta(item);
+					data = Objs.filter(data, function (value, key) {
+						return options.ignoreLock || (!meta.lockedItem && !meta.lockedAttrs[key]);
+					}, this);
+					if (Types.is_empty(data))
+						return this.removeItemMeta(item);
+					if (options.lockAttrs) {
+						Objs.iter(data, function (value, key) {
+							meta.lockedAttrs[key] = true;
+						}, this);
+					}
+					if (options.refreshMeta)
+						meta.refreshMeta = this.cacheStrategy.itemRefreshMeta(meta.refreshMeta);
+					if (options.accessMeta)
+						meta.accessMeta = this.cacheStrategy.itemAccessMeta(meta.accessMeta);
+					return this.itemCache.update(id, this.addItemMeta(data, meta)).mapSuccess(function (result) {
+						result = this.removeItemMeta(result);
+						if (!options.silent)
+							this._updated(result, data);
+						return result;
+					}, this);					
+				}, this);
+			},
+
+			cacheInsertUpdate: function (data, options) {
+				var id = data[this.remoteStore.id_key()];
+				return this.itemCache.get(id).mapSuccess(function (item) {
+					return item ? this.cacheUpdate(id, data, options) : this.cacheInsert(data, options);
+				}, this);
+			},
+
+			/*
+			 * options:
+			 *   - ignoreLock: boolean
+			 *   - silent: boolean
+			 */
+			cacheRemove: function (id, options) {
+				return this.itemCache.get(id).mapSuccess(function (data) {
+					if (!data)
+						return data;
+					var meta = this.readItemMeta(data);
+					if (!options.ignoreLock && (meta.lockedItem || !Types.is_empty(meta.lockedAttrs)))
+						return Promise.error("locked item");
+					return this.itemCache.remove(id).success(function () {
+						if (!options.silent)
+							this._removed(id);
+					}, this);
+				}, this);
+			},
+
+			/*
+			 * options:
+			 *   - silentInsert: boolean
+			 *   - silentUpdate: boolean
+			 *   - silentRemove: boolean
+			 *   - refreshMeta: boolean
+			 *   - accessMeta: boolean
+			 */
+			cacheGet: function (id, options) {
+				return this.itemCache.get(id).mapSuccess(function (data) {
+					if (!data) {
+						return this.remoteStore.get(id).success(function (data) {
+							this.online();
+							if (data) {
+								this.cacheInsert(data, {
+									lockItem: false,
+									silent: options.silentInsert,
+									accessMeta: true,
+									refreshMeta: true
+								});
+							}
+						}, this);
+					}
+					var meta = this.readItemMeta(data);
+					if (this.cacheStrategy.validItemRefreshMeta(meta.refreshMeta) || meta.lockedItem) {
+						if (options.accessMeta) {
+							meta.accessMeta = this.cacheStrategy.itemAccessMeta(meta.accessMeta);
+							this.itemCache.update(id, this.addItemMeta({}, meta));
+						}
+						return this.removeItemMeta(data);
+					}
+					return this.remoteStore.get(id).success(function (data) {
+						this.online();
+						if (data) {
+							this.cacheUpdate(id, data, {
+								ignoreLock: false,
+								lockAttrs: false,
+								silent: options.silentUpdate,
+								accessMeta: true,
+								refreshMeta: true
+							});
+						} else {
+							this.cacheRemove(id, {
+								ignoreLock: false,
+								silent: options.silentRemove
+							});
+						}
+					}, this).mapError(function () {
+						this.offline();
+						return Promise.value(data);
+					}, this);
+				}, this);
+			},
+
+			/*
+			 * options:
+			 *   - silent: boolean
+			 *   - queryRefreshMeta: boolean
+			 *   - queryAccessMeta: boolean
+			 *   - refreshMeta: boolean
+			 *   - accessMeta: boolean
+			 */
+			cacheQuery: function (query, queryOptions, options) {
+				var queryString = Constrained.serialize({
+					query: query,
+					options: queryOptions
+				});
+				var localQuery = Objs.objectBy(
+						this._options.queryKey,
+						queryString
+				);
+				return this.queryCache.query(localQuery, {limit : 1}).mapSuccess(function (result) {
+					result = result.hasNext() ? result.next() : null;
+					if (result) {
+						var meta = this.readQueryMeta(result);
+						var query_id = this.queryCache.id_of(result);
+						if (this.cacheStrategy.validQueryRefreshMeta(meta.refreshMeta)) {
+							if (options.queryAccessMeta) {
+								meta.accessMeta = this.cacheStrategy.queryAccessMeta(meta.accessMeta);
+								this.queryCache.update(query_id, this.addQueryMeta({}, meta));
+							}
+							return this.itemCache.query(query, options).mapSuccess(function (items) {
+								items = items.asArray();
+								Objs.iter(items, function (item) {
+									this.cacheUpdate(this.itemCache.id_of(item), {}, {
+										lockItem: false,
+										lockAttrs: false,
+										silent: true,
+										accessMeta: options.accessMeta,
+										refreshMeta: false
+									});
+								}, this);
+								return new MappedIterator(new ArrayIterator(items), this.removeItemMeta, this);
+							}, this);
+						}
+						this.queryCache.remove(query_id);
+					}
+					return this.remoteStore.query(query, queryOptions).mapSuccess(function (items) {
+						this.online();
+						items = items.asArray();
+						var meta = {
+								refreshMeta: options.queryRefreshMeta ? this.cacheStrategy.queryRefreshMeta() : null,
+										accessMeta: options.queryAccessMeta ? this.cacheStrategy.queryAccessMeta() : null
+						};
+						this.queryCache.insert(Objs.objectBy(
+								this._options.queryKey, queryString,
+								this._options.queryMetaKey, meta
+						));
+						Objs.iter(items, function (item) {
+							this.cacheInsertUpdate(item, {
+								lockItem: false,
+								lockAttrs: false,
+								silent: options.silent,
+								accessMeta: options.accessMeta,
+								refreshMeta: options.refreshMeta
+							});
+						}, this);
+						return new ArrayIterator(items);
+					}, this).mapError(function () {
+						this.offline();
+						return this.itemCache.query(query, options).mapSuccess(function (items) {
+							items = items.asArray();
+							Objs.iter(items, function (item) {
+								this.cacheUpdate(this.itemCache.id_of(item), {}, {
+									lockItem: false,
+									lockAttrs: false,
+									silent: true,
+									accessMeta: options.accessMeta,
+									refreshMeta: false
+								});
+							}, this);
+							return new MappedIterator(new ArrayIterator(items), this.removeItemMeta, this);
+						}, this);
+					}, this);
+				}, this);
 			},
 			
-			_write_key: function (key, value) {
-				this.__data[key] = value;
+			online: function () {
+				this.trigger("online");
+				this._online = true;
 			},
 			
-			_remove_key: function (key) {
-				delete this.__data[key];
+			offline: function () {
+				this.trigger("offline");
+				this._online = false;
 			},
-			
-			_iterate: function () {
-				return new ObjectValuesIterator(this.__data);
+
+			addItemMeta: function (data, meta) {
+				data = Objs.clone(data, 1);
+				data[this._options.itemMetaKey] = meta;
+				return data;
+			},
+
+			addQueryMeta: function (data, meta) {
+				data = Objs.clone(data, 1);
+				data[this._options.queryMetaKey] = meta;
+				return data;
+			},
+
+			removeItemMeta: function (data) {
+				data = Objs.clone(data, 1);
+				delete data[this._options.itemMetaKey];
+				return data;
+			},
+
+			removeQueryMeta: function (data) {
+				data = Objs.clone(data, 1);
+				delete data[this._options.queryMetaKey];
+				return data;
+			},
+
+			readItemMeta: function (data) {
+				return data[this._options.itemMetaKey];
+			},
+
+			readQueryMeta: function (data) {
+				return data[this._options.queryMetaKey];
+			},
+
+			unlockItem: function (id) {
+				this.itemCache.get(id).success(function (data) {
+					if (!data) 
+						return;
+					var meta = this.readItemMeta(data);
+					meta.lockedItem = false;
+					meta.lockedAttrs = {};
+					this.itemCache.update(id, this.addItemMeta({}, meta));
+				}, this);
+			},
+
+			cleanup: function () {
+				if (!this._online)
+					return;
+				this.queryCache.query().success(function (queries) {
+					while (queries.hasNext()) {
+						var query = queries.next();
+						var meta = this.readQueryMeta(query);
+						if (!this.cacheStrategy.validQueryRefreshMeta(meta.refreshMeta) || !this.cacheStrategy.validQueryAccessMeta(meta.accessMeta))
+							this.queryCache.remove(this.queryCache.id_of(query));
+					}
+				}, this);
+				this.itemCache.query().success(function (items) {
+					while (items.hasNext()) {
+						var item = items.next();
+						var meta = this.readItemMeta(item);
+						if (!meta.lockedItem && Types.is_empty(meta.lockedAttrs) &&
+								(!this.cacheStrategy.validItemRefreshMeta(meta.refreshMeta) || !this.cacheStrategy.validItemAccessMeta(meta.accessMeta)))
+							this.itemCache.remove(this.itemCache.id_of(item));
+					}
+				}, this);
 			}
 
-  		};
-  	});
+		};
+	});
 });
 
 
-Scoped.define("module:Stores.PassthroughStore", [
-          "module:Stores.BaseStore",
-          "base:Objs"
-  	], function (BaseStore, Objs, scoped) {
-  	return BaseStore.extend({scoped: scoped}, function (inherited) {			
-  		return {
-			
-			constructor: function (store, options) {
-				this.__store = store;
-				options = options || {};
-				options.id_key = store.id_key();
-				this._projection = options.projection || {};
+
+Scoped.define("module:Stores.CacheStrategies.CacheStrategy", [
+                                                              "base:Class"    
+                                                              ], function (Class, scoped) {
+	return Class.extend({scoped: scoped}, {
+
+		itemRefreshMeta: function (refreshMeta) {},
+
+		queryRefreshMeta: function (refreshMeta) {},
+
+		itemAccessMeta: function (accessMeta) {},
+
+		queryAccessMeta: function (accessMeta) {},
+
+		validItemRefreshMeta: function (refreshMeta) {},
+
+		validQueryRefreshMeta: function (refreshMeta) {},
+
+		validItemAccessMeta: function (accessMeta) {},
+
+		validQueryAccessMeta: function (accessMeta) {}
+
+
+	});	
+});
+
+
+Scoped.define("module:Stores.CacheStrategies.ExpiryCacheStrategy", [
+                                                                    "module:Stores.CacheStrategies.CacheStrategy",
+                                                                    "base:Time",
+                                                                    "base:Objs"
+                                                                    ], function (CacheStrategy, Time, Objs, scoped) {
+	return CacheStrategy.extend({scoped: scoped}, function (inherited) {
+		return {
+
+			constructor: function (options) {
+				inherited.constructor.call(this);
+				this._options = Objs.extend({
+					itemRefreshTime: 24 * 60 * 1000,
+					itemAccessTime: 10 * 60 * 60 * 1000,
+					queryRefreshTime: 24 * 60 * 1000,
+					queryAccessTime: 10 * 60 * 60 * 1000,
+					now: function () {
+						return Time.now();
+					}
+				}, options);
+			},
+
+			itemRefreshMeta: function (refreshMeta) {
+				return refreshMeta ? refreshMeta : this._options.now() + this._options.itemRefreshTime; 
+			},
+
+			queryRefreshMeta: function (refreshMeta) {
+				return refreshMeta ? refreshMeta : this._options.now() + this._options.queryRefreshTime; 
+			},
+
+			itemAccessMeta: function (accessMeta) {
+				return this._options.now() + this._options.itemAccessTime; 
+			},
+
+			queryAccessMeta: function (accessMeta) {
+				return this._options.now() + this._options.queryAccessTime; 
+			},
+
+			validItemRefreshMeta: function (refreshMeta) {
+				return refreshMeta >= this._options.now();
+			},
+
+			validQueryRefreshMeta: function (refreshMeta) {
+				return refreshMeta >= this._options.now();
+			},	
+
+			validItemAccessMeta: function (accessMeta) {
+				return accessMeta >= this._options.now();
+			},
+
+			validQueryAccessMeta: function (accessMeta) {
+				return accessMeta >= this._options.now();
+			}
+
+		};
+	});	
+});
+Scoped.define("module:Stores.PartialStore", [
+                                            "module:Stores.BaseStore",
+                                            "module:Stores.CachedStore",
+                                            "module:Stores.PartialStoreWriteStrategies.PostWriteStrategy",
+                                            "base:Objs"
+                                            ], function (Store, CachedStore, PostWriteStrategy, Objs, scoped) {
+	return Store.extend({scoped: scoped}, function (inherited) {			
+		return {
+
+			constructor: function (remoteStore, options) {
 				inherited.constructor.call(this, options);
-		        if (options.destroy_store)
-		            this._auto_destroy(store);
+				this._options = Objs.extend({}, options);
+				this.remoteStore = remoteStore;
+				this.cachedStore = new CachedStore(remoteStore, this._options);
+				this.writeStrategy = this._options.writeStrategy || this.auto_destroy(new PostWriteStrategy());
+				if (this._watcher) {
+					this._watcher.on("insert", this._remoteInsert, this);
+					this._watcher.on("update", this._remoteUpdate, this);
+					this._watcher.on("remove", this._remoteRemove, this);
+				}
+				this.cachedStore.on("insert", this._inserted, this);
+				this.cachedStore.on("remove", this._removed, this);
+				this.cachedStore.on("update", function (row, data) {
+					this._updated(this.cachedStore.id_of(row), data);
+				}, this);
 			},
 			
-			_query_capabilities: function () {
-				return this.__store._query_capabilities();
+			destroy: function () {
+				if (this._watcher)
+					this._watcher.off(null, null, this);
+				this.cachedStore.destroy();
+				inherited.destroy.call(this);
 			},
-		
+
 			_insert: function (data) {
-				return this.__store.insert(Objs.extend(data, this._projection));
+				return this.writeStrategy.insert(this, data);
 			},
 			
 			_remove: function (id) {
-				return this.__store.remove(id);
-			},
-			
-			_get: function (id) {
-				return this.__store.get(id);
+				return this.writeStrategy.remove(this, id);
 			},
 			
 			_update: function (id, data) {
-				return this.__store.update(id, data);
+				return this.writeStrategy.update(this, id, data);
+			},
+
+			_get: function (id) {
+				return this.cachedStore.get(id);
 			},
 			
 			_query: function (query, options) {
-				return this.__store.query(Objs.extend(query, this._projection), options);
+				return this.cachedStore.query(query, options);
+			},			
+			
+			_query_capabilities: function () {
+				return this.cachedStore._query_capabilities();
 			},
 			
-			_ensure_index: function (key) {
-				return this.__store.ensure_index(key);
+			_remoteInsert: function (data) {
+				this.cachedStore.cacheInsert(data, {
+					lockItem: false,
+					silent: false,
+					refreshMeta: true,
+					accessMeta: true
+				});
 			},
 			
-			_store: function () {
-				return this.__store;
+			_remoteUpdate: function (row, data) {
+				var id = this.remoteStore.id_of(row);
+				this.cachedStore.cacheUpdate(id, data, {
+					ignoreLock: false,
+					lockAttrs: false,
+					silent: false,
+					accessMeta: true,
+					refreshMeta: true
+				});
+			},
+			
+			_remoteRemove: function (id) {
+				this.cachedStore.cacheRemove(id, {
+					ignoreLock: true,
+					silent: false
+				});
 			}
 
-  		};
-  	});
+		};
+	});	
+});
+Scoped.define("module:Stores.PartialStoreWriteStrategies.WriteStrategy", [
+                                                                          "base:Class"
+                                                                          ], function (Class, scoped) {
+	return Class.extend({scoped: scoped}, function (inherited) {
+		return {
+
+			insert: function (partialStore, data) {},
+
+			remove: function (partialStore, id) {},
+
+			update: function (partialStore, data) {}
+
+		};
+	});
+});
+
+Scoped.define("module:Stores.PartialStoreWriteStrategies.PostWriteStrategy", [
+                                                                              "module:Stores.PartialStoreWriteStrategies.WriteStrategy"
+                                                                              ], function (Class, scoped) {
+	return Class.extend({scoped: scoped}, function (inherited) {
+		return {
+
+			insert: function (partialStore, data) {
+				return partialStore.remoteStore.insert(data).mapSuccess(function (data) {
+					return partialStore.cachedStore.cacheInsert(data, {
+						lockItem: false,
+						silent: true,
+						refreshMeta: true,
+						accessMeta: true
+					});
+				});
+			},
+
+			remove: function (partialStore, id) {
+				return partialStore.remoteStore.remove(id).mapSuccess(function () {
+					return partialStore.cachedStore.cacheRemove(id, {
+						ignoreLock: true,
+						silent: true
+					});
+				});
+			},
+
+			update: function (partialStore, id, data) {
+				return partialStore.remoteStore.update(id, data).mapSuccess(function () {
+					return partialStore.cachedStore.cacheUpdate(id, data, {
+						ignoreLock: false,
+						lockAttrs: false,
+						silent: true,
+						refreshMeta: true,
+						accessMeta: true
+					});
+				});
+			}
+
+		};
+	});
 });
 
 
+Scoped.define("module:Stores.PartialStoreWriteStrategies.PreWriteStrategy", [
+                                                                             "module:Stores.PartialStoreWriteStrategies.WriteStrategy"
+                                                                             ], function (Class, scoped) {
+	return Class.extend({scoped: scoped}, function (inherited) {
+		return {
 
-Scoped.define("module:Stores.ActiveStore", [
-          "module:Stores.PassthroughStore"
-  	], function (PassthroughStore, scoped) {
-  	return PassthroughStore.extend({scoped: scoped}, function (inherited) {			
-  		return {
-			
-			constructor: function (store, listener, options) {
-				inherited.constructor.call(this, store, options);
-				this.__listener = listener;
-				this.delegateEvents(null, listener);
+			insert: function (partialStore, data) {
+				return partialStore.cachedStore.cacheInsert(data, {
+					lockItem: true,
+					silent: true,
+					refreshMeta: true,
+					accessMeta: true
+				}).success(function (data) {
+					partialStore.remoteStore.insert(data).success(function () {
+						partialStore.cachedStore.unlockItem(partialStore.cachedStore.id_of(data));
+					}).error(function () {
+						partialStore.cachedStore.cacheRemove(partialStore.cachedStore.id_of(data), {
+							ignoreLock: true,
+							silent: false
+						});
+					});
+				});
+			},
+
+			remove: function (partialStore, id) {
+				return partialStore.cachedStore.cacheRemove(id, {
+					ignoreLock: true,
+					silent: true
+				}).success(function () {
+					partialStore.remoteStore.remove(id);
+				});
+			},
+
+			update: function (partialStore, id, data) {
+				return partialStore.cachedStore.cacheUpdate(id, data, {
+					lockAttrs: true,
+					ignoreLock: false,
+					silent: true,
+					refreshMeta: false,
+					accessMeta: true
+				}).success(function (data) {
+					partialStore.remoteStore.update(id, data).success(function () {
+						partialStore.cachedStore.unlockItem(partialStore.cachedStore.id_of(data));
+					});
+				});
+			}
+	
+		};
+	});
+});
+
+
+Scoped.define("module:Stores.PartialStoreWriteStrategies.CommitStrategy", [
+                                                                           "module:Stores.PartialStoreWriteStrategies.WriteStrategy",
+                                                                           "module:Stores.StoreHistory",
+                                                                           "module:Stores.MemoryStore",
+                                                                           "base:Objs"
+                                                                           ], function (Class, StoreHistory, MemoryStore, Objs, scoped) {
+	return Class.extend({scoped: scoped}, function (inherited) {
+		return {
+
+			constructor: function (historyStore, options) {
+				inherited.constructor.call(this);
+				options = options || {};
+				this.historyStore = options.historyStore || this.auto_destroy(new MemoryStore());
+				this.storeHistory = this.auto_destroy(new StoreHistory(null, this.historyStore, {
+					source_id_key: options.source_id_key || "id",
+					row_data: {
+						pushed: false,
+						success: false
+					},
+					filter_data: {
+						pushed: false
+					}
+				}));
+			},
+
+			insert: function (partialStore, data) {
+				return partialStore.cachedStore.cacheInsert(data, {
+					lockItem: true,
+					silent: true,
+					refreshMeta: true,
+					accessMeta: true
+				}).success(function (data) {
+					this.storeHistory.sourceInsert(data);
+				}, this);
+			},
+
+			remove: function (partialStore, id) {
+				return partialStore.cachedStore.cacheRemove(id, {
+					ignoreLock: true,
+					silent: true
+				}).success(function () {
+					this.storeHistory.sourceRemove(id);
+				}, this);
+			},
+
+			update: function (partialStore, id, data) {
+				return partialStore.cachedStore.cacheUpdate(id, data, {
+					lockAttrs: true,
+					ignoreLock: false,
+					silent: true,
+					refreshMeta: false,
+					accessMeta: true
+				}).success(function () {
+					this.storeHistory.sourceUpdate(id, data);
+				}, this);
+			},
+
+			push: function (partialStore) {
+				if (this.pushing)
+					return;
+				var failedIds = {};
+				var unlockIds = {};
+				var hs = this.storeHistory.historyStore;
+				var iter = hs.query({success: false}, {sort: {commit_id: 1}}).value();
+				var next = function () {
+					if (!iter.hasNext()) {
+						this.pushing = false;
+						Objs.iter(unlockIds, function (value, id) {
+							if (value) 
+								partialStore.cachedStore.unlockItem(id);
+						}, this);
+						return;
+					}
+					var commit = iter.next();
+					var commit_id = hs.id_of(commit);
+					if (commit_id in failedIds) {
+						hs.update(commit_id, {
+							pushed: true,
+							success: false
+						});
+						next.apply(this);
+					} else {
+						var promise = null;
+						if (commit.type === "insert")
+							promise = partialStore.remoteStore.insert(commit.row);
+						else if (commit.type === "update")
+							promise = partialStore.remoteStore.update(commit.row_id, commit.row);
+						else if (commit.type === "remove")
+							promise = partialStore.remoteStore.remove(commit.row_id);
+						promise.success(function () {
+							hs.update(commit_id, {
+								pushed: true,
+								success: true
+							});
+							if (!(commit.row_id in unlockIds))
+								unlockIds[commit.row_id] = true;
+							next.apply(this);
+						}, this).error(function () {
+							hs.update(commit_id, {
+								pushed: true,
+								success: false
+							});
+							failedIds[commit_id] = true;
+							unlockIds[commit.row_id] = false;
+							next.apply(this);
+						}, this);
+					}
+				};
+				next.apply(this);
 			}
 
-  		};
-  	});
+		};
+	});
 });
 
 Scoped.define("module:Stores.RemoteStoreException", [
-          "module:Stores.StoreException",
-          "base:Net.AjaxException"
-  	], function (StoreException, AjaxException, scoped) {
-  	return StoreException.extend({scoped: scoped}, function (inherited) {			
-  		return {
-			
+                                                     "module:Stores.StoreException",
+                                                     "base:Net.AjaxException"
+                                                     ], function (StoreException, AjaxException, scoped) {
+	return StoreException.extend({scoped: scoped}, function (inherited) {			
+		return {
+
 			constructor: function (source) {
 				source = AjaxException.ensure(source);
 				inherited.constructor.call(this, source.toString());
 				this.__source = source;
 			},
-			
+
 			source: function () {
 				return this.__source;
 			}
-			
-  		};
-  	});
+
+		};
+	});
 });
 
 
-
+/**
+ * @class RemoteStore
+ *
+ * RemoteStore is a store designed to be used with remote data. It is also
+ * extended to create a queriable remote store.
+ */
 Scoped.define("module:Stores.RemoteStore", [
-         "module:Stores.BaseStore",
-         "module:Stores.RemoteStoreException",
-         "base:Objs",
-         "base:Types",
-         "json:"
- 	], function (BaseStore, RemoteStoreException, Objs, Types, JSON, scoped) {
- 	return BaseStore.extend({scoped: scoped}, function (inherited) {			
- 		return {
-                                           			
+                                            "module:Stores.BaseStore",
+                                            "module:Stores.RemoteStoreException",
+                                            "base:Objs",
+                                            "base:Types",
+                                            "json:"
+                                            ], function (BaseStore, RemoteStoreException, Objs, Types, JSON, scoped) {
+	return BaseStore.extend({scoped: scoped}, function (inherited) {			
+		return {
+
+			/**
+			 * @method constructor
+			 *
+			 * @param {string} uri The remote endpoint where the queriable data is accessible.
+			 * @param {object} ajax An instance of an concrete implementation of
+			 * BetaJS.Net.AbstractAjax. Whether BetaJS.Data is being used in
+			 * the client or server dictates which implementation of Ajax to use.
+			 * @param {object} options The options for the RemoteStore. Currently the
+			 * supported options are "update_method" and "uri_mappings".
+			 *
+			 * @example
+			 * // Returns new instance of RemoteStore
+			 * new RemoteStore('/api/v1/people', new BetaJS.Browser.JQueryAjax(), {})
+			 */
 			constructor : function(uri, ajax, options) {
 				inherited.constructor.call(this, options);
 				this._uri = uri;
@@ -1867,11 +2645,27 @@ Scoped.define("module:Stores.RemoteStore", [
 					"uri_mappings": {}
 				}, options || {});
 			},
-			
+
+			/**
+			 * @method getUri
+			 *
+			 * @return {string} The uri instance variable.
+			 */
 			getUri: function () {
 				return this._uri;
 			},
-			
+
+			/**
+			 * @method prepare_uri
+			 *
+			 * @param {string} action The action to be performed on the remote data
+			 * store. For example, remove, get...
+			 * @param {object} data The data on which the action will be performed.
+			 * For example, the object being updated.
+			 *
+			 * @return {string} The uri to be used to perform the specified action on
+			 * the specified data.
+			 */
 			prepare_uri: function (action, data) {
 				if (this.__options.uri_mappings[action])
 					return this.__options.uri_mappings[action](data);
@@ -1879,13 +2673,38 @@ Scoped.define("module:Stores.RemoteStore", [
 					return this.getUri() + "/" + data[this._id_key];
 				return this.getUri();
 			},
-			
+
+			/**
+			 * @method _encode_query
+			 *
+			 * @param {object} query The query object.
+			 * @param {object} options Options for the specified query.
+			 *
+			 * @protected
+			 *
+			 * @return {string} A uri to perform the specified query.
+			 */
 			_encode_query: function (query, options) {
 				return {
 					uri: this.prepare_uri("query")
 				};		
 			},
-			
+
+			/**
+			 * @method __invoke
+			 *
+			 * Invoke the specified operation on the remote data store.
+			 *
+			 * @param {object} options The options for the ajax.asyncCall. Specifies
+			 * the method, uri, and data. See "_insert" for an example.
+			 * @param {boolean} parse_json Boolean flag indicating if the response
+			 * should be parsed as json.
+			 *
+			 * @private
+			 *
+			 * @return {object} The remote response from invoking the specified
+			 * operation.
+			 */
 			__invoke: function (options, parse_json) {
 				return this.__ajax.asyncCall(options).mapCallback(function (e, result) {
 					if (e)
@@ -1898,7 +2717,18 @@ Scoped.define("module:Stores.RemoteStore", [
 					return result;
 				});
 			},
-			
+
+			/**
+			 * @method _insert
+			 *
+			 * Insert the given data into the remote store.
+			 *
+			 * @param {object} data The data to be inserted.
+			 *
+			 * @protected
+			 *
+			 * @return {object} The result of invoking insert.
+			 */
 			_insert : function(data) {
 				return this.__invoke({
 					method: "POST",
@@ -1906,7 +2736,18 @@ Scoped.define("module:Stores.RemoteStore", [
 					data: data
 				}, true);
 			},
-		
+
+			/**
+			 * @method _get
+			 *
+			 * Get the data specified by the id parameter from the remote store.
+			 *
+			 * @param {int} id The id of the data to be retrieved.
+			 *
+			 * @protected
+			 *
+			 * @return {object} The desired data.
+			 */
 			_get : function(id) {
 				var data = {};
 				data[this._id_key] = id;
@@ -1914,7 +2755,20 @@ Scoped.define("module:Stores.RemoteStore", [
 					uri: this.prepare_uri("get", data)
 				});
 			},
-		
+
+			/**
+			 * @method _update
+			 *
+			 * Update data.
+			 *
+			 * @param {int} id The id of the data to be updated.
+			 * @param {object} data The new data to be used for the update.
+			 *
+			 * @protected
+			 *
+			 * @return {object} The result of invoking the update operation on the
+			 * remote store.
+			 */
 			_update : function(id, data) {
 				var copy = Objs.clone(data, 1);
 				copy[this._id_key] = id;
@@ -1924,7 +2778,19 @@ Scoped.define("module:Stores.RemoteStore", [
 					data: data
 				});
 			},
-			
+
+			/**
+			 * @method _remove
+			 *
+			 * Remove data.
+			 *
+			 * @param {int} id The id of the data to be removed.
+			 *
+			 * @protected
+			 *
+			 * @return {object} The result of invoking the remove operation on the
+			 * remote store.
+			 */
 			_remove : function(id) {
 				var data = {};
 				data[this._id_key] = id;
@@ -1933,29 +2799,86 @@ Scoped.define("module:Stores.RemoteStore", [
 					uri: this.prepare_uri("remove", data)
 				});
 			},
-		
+
+			/**
+			 * @method _query
+			 *
+			 * Query the remote store.
+			 *
+			 * @param {object} query The query object specifying the query fields and
+			 * their respective values.
+			 * @param {object} options The options object specifying which options are
+			 * set, and what the respective values are.
+			 *
+			 * @protected
+			 *
+			 * @return {object} The result of invoking the query operation on the
+			 * remote store.
+			 */
 			_query : function(query, options) {
 				return this.__invoke(this._encode_query(query, options), true);
 			}	
-			
- 		};
- 	});
+
+		};
+	});
 });
 
 
+/**
+ * @class QueryGetParamsRemoteStore
+ *
+ * QueryGetParamsRemoteStore should be used if the following conditions are met.
+ * - Data is remotely accessible. For example, accessible through REST ajax
+ *   calls.
+ * - Data is quierable and will be queried. 
+ *
+ * @augments RemoteStore
+ */
 Scoped.define("module:Stores.QueryGetParamsRemoteStore", [
-        "module:Queries",
-        "module:Stores.RemoteStore",
-        "json:"
-	], function (Queries, RemoteStore, JSON, scoped) {
+                                                          "module:Queries",
+                                                          "module:Stores.RemoteStore",
+                                                          "json:"
+                                                          ], function (Queries, RemoteStore, JSON, scoped) {
 	return RemoteStore.extend({scoped: scoped}, function (inherited) {			
 		return {
-                                          			
+
+			/**
+			 * @inheritdoc
+			 *
+			 * @param {Object} capability_params An object representing the remote
+			 * endpoints querying capabilities. The keys are
+			 * query aspects the remote data source can handle. The values are the
+			 * identifiers for these capabilites in the uri. For example, if a server
+			 * can process the skip field in a query, and expects the skip fields to
+			 * be called "jump" in the Uri, the capability_param object would be
+			 * `{"skip": "jump"}`.
+			 * @param {Object} options
+			 *
+			 * @example <caption>Creation of client side QueryGetParamsRemoteStore</caption>
+			 * // returns new QueryGetParamsRemoteStore
+			 * new QueryGetParamsRemoteStore('api/v1/people',
+			 *                                new BetaJS.Browser.JQueryAjax(),
+			 *                                {"skip": "skip", "query": "query"});
+			 *
+			 * @return {QueryGetParamsRemoteStore} The newly constructed instance of
+			 * QueryGetParamsRemoteStore.
+			 */
 			constructor : function(uri, ajax, capability_params, options) {
 				inherited.constructor.call(this, uri, ajax, options);
 				this.__capability_params = capability_params;
 			},
-			
+
+			/**
+			 * @method _query_capabilities
+			 *
+			 * Helper method for dealing with capability_params.
+			 *
+			 * @protected
+			 *
+			 * @return {object} Key/value object where key is possible capability
+			 * parameter and value is if that capability_parameter is included for
+			 * this instance.
+			 */
 			_query_capabilities: function () {
 				var caps = {};
 				if ("skip" in this.__capability_params)
@@ -1968,7 +2891,30 @@ Scoped.define("module:Stores.QueryGetParamsRemoteStore", [
 					caps.sort = true;
 				return caps;
 			},
-		
+
+			/**
+			 * @method _encode_query
+			 *
+			 * Helper method that encodes the query and the options into a uri to send
+			 * to the remote data source.
+			 *
+			 * @param {object} query A query to be encoded into uri form. The query
+			 * will only be included in the uri if "query" was included in the
+			 * capability_params during this instances construction.
+			 * @param {object} options A set of options to be encoded into uri form.
+			 *
+			 * @protected
+			 *
+			 * @TODO Include the option of including the query param in the uri as a
+			 * simple list of keys and values. For example, if the query param is
+			 * `{'test': 'hi'}`, the uri becomes 'BASE_URL?test=hi&MORE_PARAMS'
+			 * instead of 'BASE_URL?query={"test":"hi"}&MORE_PARAMS'. This change
+			 * would increase the number of server/api configurations that could use
+			 * this method of encoding queries.
+			 *
+			 * @return {object} The only key is the uri, and the associated value is
+			 * the uri representing the query and the options.
+			 */
 			_encode_query: function (query, options) {
 				options = options || {};
 				var uri = this.getUri() + "?"; 
@@ -1984,17 +2930,16 @@ Scoped.define("module:Stores.QueryGetParamsRemoteStore", [
 					uri: uri
 				};		
 			}
-
 		};
 	});
 });
 Scoped.define("module:Stores.SocketStore", [
-          "module:Stores.BaseStore",
-          "base:Objs"
-  	], function (BaseStore, Objs, scoped) {
-  	return BaseStore.extend({scoped: scoped}, function (inherited) {			
-  		return {
-			
+                                            "module:Stores.BaseStore",
+                                            "base:Objs"
+                                            ], function (BaseStore, Objs, scoped) {
+	return BaseStore.extend({scoped: scoped}, function (inherited) {			
+		return {
+
 			constructor: function (options, socket, prefix) {
 				inherited.constructor.call(this, options);
 				this.__socket = socket;
@@ -2006,812 +2951,1111 @@ Scoped.define("module:Stores.SocketStore", [
 			__send: function (action, data) {
 				this.__socket.emit(this.__prefix + ":" + action, data);
 			},
-			
+
 			_insert: function (data) {
 				this.__send("insert", data);
 			},
-			
+
 			_remove: function (id) {
 				this.__send("remove", id);
 			},
-			
+
 			_update: function (id, data) {
 				this.__send("update", Objs.objectBy(id, data));
 			}	
 
-  		};
-  	});
+		};
+	});
 });
 
 
-Scoped.define("module:Stores.SocketListenerStore", [
-        "module:Stores.ListenerStore",
-        "module:Stores.StoreException",
-        "base:Objs"
-	], function (ListenerStore, StoreException, Objs, scoped) {
-	return ListenerStore.extend({scoped: scoped}, function (inherited) {			
+
+Scoped.define("module:Stores.Watchers.ConsumerWatcher", [
+                                                         "module:Stores.Watchers.StoreWatcher"
+                                                         ], function(StoreWatcher, scoped) {
+	return StoreWatcher.extend({scoped: scoped}, function (inherited) {
 		return {
-		
-			constructor: function (options, socket, prefix) {
+
+			constructor: function (sender, receiver, options) {
 				inherited.constructor.call(this, options);
-				var self = this;
-				this.__prefix = prefix;
-				socket.on(this.__prefix + ":insert", function (data) {
-					self._perform("insert", data);
-				});
-				socket.on(this.__prefix + ":remove", function (id) {
-					self._perform("remove", id);
-				});
-				socket.on(this.__prefix + ":update", function (data) {
-					self._perform("update", data);
-				});
-				socket.on(this.__prefix + ":bulk", function (commits) {
-					for (var i = 0; i < commits.length; ++i)
-						self._perform(Objs.keyByIndex(commits[i]), Objs.valueByIndex(commits[i]));
-				});
+				this._receiver = receiver;
+				this._sender = sender;
+				receiver.on("receive", function (message, data) {
+					if (message === "insert")
+						this._insertedWatchedInsert(data);
+					if (message === "update")
+						this._updatedWatchedItem(data.row, data.data);
+					else if (message === "remove")
+						this._removedWatchedItem(data);
+				}, this);
 			},
-			
-			_perform: function (action, data) {
-				if (action == "insert")
-					this._inserted(data);
-				else if (action == "remove")
-					this._removed(data);
-				else if (action == "update")
-					this._updated(Objs.objectBy(this.id_key(), Objs.keyByIndex(data)), Objs.valueByIndex(data));
-				else
-					throw new StoreException("unsupported: perform " + action);
+
+			destroy: function () {
+				this._receiver.off(null, null, this);
+				inherited.destroy.apply(this);
+			},
+
+			_watchItem: function (id) {
+				this._sender.send("watch_item", id);
+			},
+
+			_unwatchItem: function (id) {
+				this._sender.send("unwatch_item", id);
+			},
+
+			_watchInsert: function (query) {
+				this._sender.send("watch_insert", query);
+			},
+
+			_unwatchInsert: function (query) {
+				this._sender.send("unwatch_insert", query);
 			}
 
 		};
 	});
 });
+
+
+Scoped.define("module:Stores.Watchers.ProducerWatcher", [
+                                                         "base:Class"
+                                                         ], function(Class, scoped) {
+	return Class.extend({scoped: scoped}, function (inherited) {
+		return {
+
+			constructor: function (sender, receiver, watcher) {
+				inherited.constructor.apply(this);
+				this._watcher = watcher;
+				this._receiver = receiver;
+				receiver.on("receive", function (message, data) {
+					if (message === "watch_item")
+						watcher.watchItem(data, this);
+					else if (message === "unwatch_item")
+						watcher.unwatchItem(data, this);
+					else if (message === "watch_insert")
+						watcher.watchInsert(data, this);
+					else if (message === "unwatch_insert")
+						watcher.unwatchInsert(data, this);
+				}, this);
+				watcher.on("insert", function (data) {
+					sender.send("insert", data);
+				}, this).on("update", function (row, data) {
+					sender.send("update", {row: row, data: data});
+				}, this).on("remove", function (id) {
+					sender.send("remove", id);
+				}, this);
+			},
+
+			destroy: function () {
+				this._receiver.off(null, null, this);
+				this._watcher.off(null, null, this);
+				inherited.destroy.apply(this);
+			}
+
+		};
+	});
+});
+
+Scoped.define("module:Stores.Watchers.LocalWatcher", [
+                                                      "module:Stores.Watchers.StoreWatcher"
+                                                      ], function(StoreWatcher, scoped) {
+	return StoreWatcher.extend({scoped: scoped}, function (inherited) {
+		return {
+
+			constructor: function (store, options) {
+				options = options || {};
+				options.id_key = store.id_key();
+				inherited.constructor.call(this, options);
+				this._store = store;
+				this._store.on("insert", function (data) {
+					this._insertedInsert(data);
+				}, this).on("update", function (row, data) {
+					this._updatedItem(row, data);
+				}, this).on("remove", function (id) {
+					this._removedItem(id);
+				}, this);
+			},
+
+			destroy: function () {
+				this._store.off(null, null, this);
+				inherited.destroy.apply(this);
+			}
+
+		};
+	});
+});
+
+Scoped.define("module:Stores.Watchers.PollWatcher", [
+                                                     "module:Stores.Watchers.StoreWatcher",
+                                                     "base:Comparators",
+                                                     "base:Objs"
+                                                     ], function(StoreWatcher, Comparators, Objs, scoped) {
+	return StoreWatcher.extend({scoped: scoped}, function (inherited) {
+		return {
+
+			constructor: function (store, options) {
+				options = options || {};
+				options.id_key = store.id_key();
+				inherited.constructor.call(this, options);
+				this._store = store;
+				options = options || {};
+				this.__itemCache = {};
+				this.__lastKey = null;
+				this.__insertsCount = 0;
+				this.__increasingKey = options.increasing_key || this.id_key;
+			},
+
+			_watchItem : function(id) {
+				this.__itemCache[id] = null;
+			},
+
+			_unwatchItem : function(id) {
+				delete this.__itemCache[id];
+			},
+
+			_queryLastKey: function () {
+				var sort = {};
+				return this._store.query({}, {
+					limit: 1,
+					sort: Objs.objectBy(this.__increasingKey, -1)
+				}).mapSuccess(function (iter) {
+					return iter.hasNext() ? iter.next()[this.__increasingKey] : null;
+				}, this).mapError(function () {
+					return null;
+				});
+			},
+
+			_watchInsert : function(query) {
+				if (this.__insertsCount === 0) {
+					this._queryLastKey().success(function (value) {
+						this.__lastKey = value;
+					}, this);
+				}
+				this.__insertsCount++;
+			},
+
+			_unwatchInsert : function(query) {
+				this.__insertsCount--;
+				if (this.__insertsCount === 0)
+					this.__lastKey = null;
+			},
+
+			poll: function () {
+				Objs.iter(this.__itemCache, function (value, id) {
+					this._store.get(id).success(function (data) {
+						if (!data)
+							this._removedItem(id);
+						else {
+							this.__itemCache[id] = Objs.clone(data, 1);
+							if (value && !Comparators.deepEqual(value, data, -1))
+								this._updatedItem(data, data);
+						}
+					}, this).error(function () {
+						this._removedItem(id);
+					}, this);
+				}, this);
+				if (this.__lastKey) {
+					this.insertsIterator().iterate(function (query) {
+						var keyQuery = Objs.objectBy(this.__increasingKey, {"$gte": this.__lastKey});
+						this._store.query({"$and": [keyQuery, query]}).success(function (result) {
+							while (result.hasNext())
+								this._insertedInsert(result.next());
+						}, this);
+					}, this);
+				}
+				this._queryLastKey().success(function (value) {
+					this.__lastKey = value;
+				}, this);
+			}
+
+		};
+	});
+});
+
+Scoped.define("module:Stores.Watchers.StoreWatcherMixin", [], function() {
+	return {
+
+		watchItem : function(id, context) {},
+
+		unwatchItem : function(id, context) {},
+
+		watchInsert : function(query, context) {},
+
+		unwatchInsert : function(query, context) {},
+
+		_removedWatchedItem : function(id) {
+			this.trigger("remove", id);
+		},
+
+		_updatedWatchedItem : function(row, data) {
+			this.trigger("update", row, data);
+		},
+
+		_insertedWatchedInsert : function(data) {
+			this.trigger("insert", data);
+		},
+		
+		delegateStoreEvents: function (store) {
+			this.on("insert", function (data) {
+				store.trigger("insert", data);
+			}, store).on("update", function (row, data) {
+				store.trigger("update", row, data);
+			}, store).on("remove", function (id) {
+				store.trigger("remove", id);
+			}, store);
+		},
+
+		undelegateStoreEvents: function (store) {
+			this.off(null, null, store);
+		}
+
+	};	
+});
+
+
+Scoped.define("module:Stores.Watchers.StoreWatcher", [
+                                                      "base:Class",
+                                                      "base:Events.EventsMixin",
+                                                      "base:Classes.ContextRegistry",    
+                                                      "module:Stores.Watchers.StoreWatcherMixin",
+                                                      "module:Queries"
+                                                      ], function(Class, EventsMixin, ContextRegistry, StoreWatcherMixin, Queries, scoped) {
+	return Class.extend({scoped: scoped}, [EventsMixin, StoreWatcherMixin, function (inherited) {
+		return {
+
+			constructor: function (options) {
+				inherited.constructor.call(this);
+				options = options || {};
+				if (options.id_key)
+					this.id_key = options.id_key;
+				else
+					this.id_key = "id";
+				this.__items = new ContextRegistry();
+				this.__inserts = new ContextRegistry(Queries.serialize, Queries);
+			},
+
+			destroy: function () {
+				this.__inserts.iterator().iterate(this.unwatchInsert, this);
+				this.__items.iterator().iterate(this.unwatchItem, this);
+				this.__inserts.destroy();
+				this.__items.destroy();
+				inherited.destroy.call(this);
+			},
+
+			insertsIterator: function () {
+				return this.__inserts.iterator();
+			},
+
+			watchItem : function(id, context) {
+				if (this.__items.register(id, context))
+					this._watchItem(id);
+			},
+
+			unwatchItem : function(id, context) {
+				if (this.__items.unregister(id, context))
+					this._unwatchItem(id);
+			},
+
+			watchInsert : function(query, context) {
+				if (this.__inserts.register(query, context))
+					this._watchInsert(query);
+			},
+
+			unwatchInsert : function(query, context) {
+				if (this.__inserts.unregister(query, context))
+					this._unwatchInsert(query);
+			},
+
+			_removedItem : function(id) {
+				if (!this.__items.get(id))
+					return;
+				this.unwatchItem(id, null);
+				this._removedWatchedItem(id);
+			},
+
+			_updatedItem : function(row, data) {
+				var id = row[this.id_key];
+				if (!this.__items.get(id))
+					return;
+				this._updatedWatchedItem(id);
+			},
+
+			_insertedInsert : function(data) {
+				var trig = false;
+				var iter = this.__inserts.iterator();
+				while (!trig && iter.hasNext())
+					trig = Queries.evaluate(iter.next(), data);
+				if (!trig)
+					return;
+				this._insertedWatchedInsert(data);
+			},
+
+			unregisterItem: function (id, context) {
+				if (this.__items.unregister(id, context))
+					this._unregisterItem(id);
+			},			
+
+			_watchItem : function(id) {},
+
+			_unwatchItem : function(id) {},
+
+			_watchInsert : function(query) {},
+
+			_unwatchInsert : function(query) {}
+
+		};
+	}]);
+});
+
+
 Scoped.define("module:Stores.AbstractIndex", [
-	"base:Class",
-	"base:Comparators",
-	"base:Objs",
-	"base:Functions"
-], function (Class, Comparators, Objs, Functions, scoped) {
-  	return Class.extend({scoped: scoped}, function (inherited) {
-  		return {
-  			
-  			constructor: function (store, key, compare, options) {
-  				inherited.constructor.call(this);
-  				this._options = Objs.extend({
-  					exact: true,
-  					ignoreCase: false
-  				}, options);
-  				this._compare = compare || Comparators.byValue;
-  				this._store = store;
-  				this.__row_count = 0;
-  				this._initialize();
-  				var id_key = store.id_key();
-  				store.query({}).value().iterate(function (row) {
-  					this.__row_count++;
-  					this._insert(row[id_key], row[key]);
-  				}, this);
-  				store.on("insert", function (row) {
-  					this.__row_count++;
-  					this._insert(row[id_key], row[key]);
-  				}, this);
-  				store.on("remove", function (id) {
-  					this.__row_count--;
-  					this._remove(id);
-  				}, this);
-  				store.on("update", function (id, data) {
-  					if (key in data)
-  						this._update(id, data[key]);
-  				}, this);
-  			},
-  			
-  			_initialize: function () {},
+                                              "base:Class",
+                                              "base:Comparators",
+                                              "base:Objs",
+                                              "base:Functions"
+                                              ], function (Class, Comparators, Objs, Functions, scoped) {
+	return Class.extend({scoped: scoped}, function (inherited) {
+		return {
 
-  			destroy: function () {
-  				this._store.off(null, null, this);
-  				inherited.destroy.call(this);
-  			},
-  			
-  			compare: function () {
-  				return this._compare.apply(arguments);
-  			},
-  			
-  			comparator: function () {
-  				return Functions.as_method(this, this._compare);
-  			},
-  			
-  			info: function () {
-  				return {
-  					row_count: this.__row_count,
-  					key_count: this._key_count(),
-  					key_count_ic: this._key_count_ic()
-  				};
-  			},
-  			
-  			options: function () {
-  				return this._options;
-  			},
-  			
-  			iterate: function (key, direction, callback, context) {
-  				this._iterate(key, direction, callback, context);
-  			},
-  			
-  			itemIterate: function (key, direction, callback, context) {
-  				this.iterate(key, direction, function (iterKey, id) {
-  					return callback.call(context, iterKey, this._store.get(id).value());
-  				}, this); 
-  			},
-  			
-  			iterate_ic: function (key, direction, callback, context) {
-  				this._iterate_ic(key, direction, callback, context);
-  			},
-  			
-  			itemIterateIc: function (key, direction, callback, context) {
-  				this.iterate_ic(key, direction, function (iterKey, id) {
-  					return callback.call(context, iterKey, this._store.get(id).value());
-  				}, this); 
-  			},
+			constructor: function (store, key, compare, options) {
+				inherited.constructor.call(this);
+				this._options = Objs.extend({
+					exact: true,
+					ignoreCase: false
+				}, options);
+				this._compare = compare || Comparators.byValue;
+				this._store = store;
+				this.__row_count = 0;
+				this._initialize();
+				var id_key = store.id_key();
+				store.query({}).value().iterate(function (row) {
+					this.__row_count++;
+					this._insert(row[id_key], row[key]);
+				}, this);
+				store.on("insert", function (row) {
+					this.__row_count++;
+					this._insert(row[id_key], row[key]);
+				}, this);
+				store.on("remove", function (id) {
+					this.__row_count--;
+					this._remove(id);
+				}, this);
+				store.on("update", function (id, data) {
+					if (key in data)
+						this._update(id, data[key]);
+				}, this);
+			},
 
-  			_iterate: function (key, direction, callback, context) {},
-  			
-  			_iterate_ic: function (key, direction, callback, context) {},
+			_initialize: function () {},
 
-  			_insert: function (id, key) {},
-  			
-  			_remove: function (id) {},
-  			
-  			_update: function (id, key) {},
-  			
-  			_key_count: function () {},
-  			
-  			_key_count_ic: function () {},
-  			
-  			key_count_left_ic: function (key) {},
-  			key_count_right_ic: function (key) {},
-  			key_count_distance_ic: function (leftKey, rightKey) {},
-  			key_count_left: function (key) {},
-  			key_count_right: function (key) {},
-  			key_count_distance: function (leftKey, rightKey) {}
-  		
-  		};
-  	});
+			destroy: function () {
+				this._store.off(null, null, this);
+				inherited.destroy.call(this);
+			},
+
+			compare: function () {
+				return this._compare.apply(arguments);
+			},
+
+			comparator: function () {
+				return Functions.as_method(this, this._compare);
+			},
+
+			info: function () {
+				return {
+					row_count: this.__row_count,
+					key_count: this._key_count(),
+					key_count_ic: this._key_count_ic()
+				};
+			},
+
+			options: function () {
+				return this._options;
+			},
+
+			iterate: function (key, direction, callback, context) {
+				this._iterate(key, direction, callback, context);
+			},
+
+			itemIterate: function (key, direction, callback, context) {
+				this.iterate(key, direction, function (iterKey, id) {
+					return callback.call(context, iterKey, this._store.get(id).value());
+				}, this); 
+			},
+
+			iterate_ic: function (key, direction, callback, context) {
+				this._iterate_ic(key, direction, callback, context);
+			},
+
+			itemIterateIc: function (key, direction, callback, context) {
+				this.iterate_ic(key, direction, function (iterKey, id) {
+					return callback.call(context, iterKey, this._store.get(id).value());
+				}, this); 
+			},
+
+			_iterate: function (key, direction, callback, context) {},
+
+			_iterate_ic: function (key, direction, callback, context) {},
+
+			_insert: function (id, key) {},
+
+			_remove: function (id) {},
+
+			_update: function (id, key) {},
+
+			_key_count: function () {},
+
+			_key_count_ic: function () {},
+
+			key_count_left_ic: function (key) {},
+			key_count_right_ic: function (key) {},
+			key_count_distance_ic: function (leftKey, rightKey) {},
+			key_count_left: function (key) {},
+			key_count_right: function (key) {},
+			key_count_distance: function (leftKey, rightKey) {}
+
+		};
+	});
 });
 
 Scoped.define("module:Stores.MemoryIndex", [
-	"module:Stores.AbstractIndex",
-	"base:Structures.TreeMap",
-	"base:Objs"
-], function (AbstractIndex, TreeMap, Objs, scoped) {
-  	return AbstractIndex.extend({scoped: scoped}, function (inherited) {
-  		return {
-  			
-  			_initialize: function () {
-  				if (this._options.exact)
-  					this._exactMap = TreeMap.empty(this._compare);
-  				if (this._options.ignoreCase)
-  					this._ignoreCaseMap = TreeMap.empty(this._compare);
-  				this._idToKey = {};
-  			},
-  			
-  			__insert: function (id, key, map) {
-  				var value = TreeMap.find(key, map);
-  				if (value)
-  					value[id] = true;
-  				else 
-  					map = TreeMap.add(key, Objs.objectBy(id, true), map);
-  				return map;
-  			},
-  			
-  			_insert: function (id, key) {
+                                            "module:Stores.AbstractIndex",
+                                            "base:Structures.TreeMap",
+                                            "base:Objs"
+                                            ], function (AbstractIndex, TreeMap, Objs, scoped) {
+	return AbstractIndex.extend({scoped: scoped}, function (inherited) {
+		return {
+
+			_initialize: function () {
+				if (this._options.exact)
+					this._exactMap = TreeMap.empty(this._compare);
+				if (this._options.ignoreCase)
+					this._ignoreCaseMap = TreeMap.empty(this._compare);
+				this._idToKey = {};
+			},
+
+			__insert: function (id, key, map) {
+				var value = TreeMap.find(key, map);
+				if (value)
+					value[id] = true;
+				else 
+					map = TreeMap.add(key, Objs.objectBy(id, true), map);
+				return map;
+			},
+
+			_insert: function (id, key) {
 				this._idToKey[id] = key;
 				if (this._options.exact)
 					this._exactMap = this.__insert(id, key, this._exactMap);
 				if (this._options.ignoreCase)
 					this._ignoreCaseMap = this.__insert(id, key, this._ignoreCaseMap);
-  			},
-  			
-  			__remove: function (key, map, id) {
-  				var value = TreeMap.find(key, map);
-  				delete value[id];
-  				if (Objs.is_empty(value))
-  					map = TreeMap.remove(key, map);
-  				return map;
-  			},
-  			
-  			_remove: function (id) {
-  				var key = this._idToKey[id];
-  				delete this._idToKey[id];
-  				if (this._options.exact)
-  					this._exactMap = this.__remove(key, this._exactMap, id);
-  				if (this._options.ignoreCase)
-  					this._ignoreCaseMap = this.__remove(key, this._ignoreCaseMap, id);
-  			},
-  			
-  			_update: function (id, key) {
-  				var old_key = this._idToKey[id];
-  				if (old_key == key)
-  					return;
-  				this._remove(id);
-  				this._insert(id, key);
-  			},
-  			
-  			_iterate: function (key, direction, callback, context) {
-  				TreeMap.iterate_from(key, this._exactMap, function (iterKey, value) {
-  					for (var id in value) {
-  						if (callback.call(context, iterKey, id) === false)
-  							return false;
-  					}
-  					return true;
-  				}, this, !direction);
-  			},	
-  		
-  			_iterate_ic: function (key, direction, callback, context) {
-  				TreeMap.iterate_from(key, this._ignoreCaseMap, function (iterKey, value) {
-  					for (var id in value) {
-  						if (callback.call(context, iterKey, id) === false)
-  							return false;
-  					}
-  					return true;
-  				}, this, !direction);
-  			},	
+			},
 
-  			_key_count: function () {
-  				return this._options.exact ? TreeMap.length(this._exactMap) : 0;
-  			},
-  			
-  			_key_count_ic: function () {
-  				return this._options.ignoreCase ? TreeMap.length(this._ignoreCaseMap) : 0;
-  			},
-  			
-  			key_count_left_ic: function (key) {
-  				return TreeMap.treeSizeLeft(key, this._ignoreCaseMap);
-  			},
-  			
-  			key_count_right_ic: function (key) {
-  				return TreeMap.treeSizeRight(key, this._ignoreCaseMap);
-  			},
-  			
-  			key_count_distance_ic: function (leftKey, rightKey) {
-  				return TreeMap.distance(leftKey, rightKey, this._ignoreCaseMap);
-  			},
-  			
-  			key_count_left: function (key) {
-  				return TreeMap.treeSizeLeft(key, this._exactMap);
-  			},
-  			
-  			key_count_right: function (key) {
-  				return TreeMap.treeSizeRight(key, this._exactMap);
-  			},
-  			
-  			key_count_distance: function (leftKey, rightKey) {
-  				return TreeMap.distance(leftKey, rightKey, this._exactMap);
-  			}
-  			
-  		};
-  	});
-});
+			__remove: function (key, map, id) {
+				var value = TreeMap.find(key, map);
+				delete value[id];
+				if (Objs.is_empty(value))
+					map = TreeMap.remove(key, map);
+				return map;
+			},
 
-
-Scoped.define("module:Stores.CachedStore", [
-          "module:Stores.DualStore",
-          "module:Stores.MemoryStore",
-          "module:Queries.DefaultQueryModel",
-          "module:Queries.Constrained",
-          "base:Objs",
-          "base:Async"
-  	], function (DualStore, MemoryStore, DefaultQueryModel, Constrained, Objs, Async, scoped) {
-  	return DualStore.extend({scoped: scoped}, function (inherited) {			
-  		return {
-
-			constructor: function (parent, options) {
-				options = options || {};
-				var cache_store = options.cache_store;
-				if (!("cache_store" in options)) {
-				    cache_store = this._auto_destroy(new MemoryStore({
-		                id_key: parent.id_key()
-		            }));
-		        }
-		        if (!cache_store.query_model())
-		            cache_store.query_model(options.cache_query_model ? options.cache_query_model : this._auto_destroy(new DefaultQueryModel()));
-		        this.__invalidation_options = options.invalidation || {};
-		        inherited.constructor.call(this,
-					parent,
-					cache_store,
-					Objs.extend({
-						get_options: {
-							start: "second",
-							strategy: "or"
-						},
-						query_options: {
-							start: "second",
-							strategy: "or",
-							clone: true,
-							or_on_null: false
-						}
-					}, options));
-			   if (this.__invalidation_options.reload_after_first_hit) {
-			       this.__queries = {};
-			       this.cache().on("query_hit", function (query, subsumizer) {
-			           var s = Constrained.serialize(subsumizer);
-			           if (!this.__queries[s]) {
-			               this.__queries[s] = true;
-			               Async.eventually(function () {
-			                   this.invalidate_query(subsumizer, true);	                   
-			               }, [], this);
-			           }
-			       }, this);
-		           this.cache().on("query_miss", function (query) {
-		               var s = Constrained.serialize(query);
-		               this.__queries[s] = true;
-		           }, this);
-			   }
-			},
-			
-			destroy: function () {
-			    this.cache().off(null, null, this);
-			    inherited.destroy.call(this);
-			},
-			
-			invalidate_query: function (query, reload) {
-			    this.cache().query_model().invalidate(query);
-			    if (reload) 
-		           this.query(query.query, query.options);
-		        this.trigger("invalidate_query", query, reload);
-			},
-			
-			cache: function () {
-				return this.second();
-			},
-			
-			store: function () {
-				return this.first();
-			}
-			
-  		};
-  	});
-});
-
-Scoped.define("module:Stores.DualStore", [
-          "module:Queries",
-          "module:Queries.Constrained",
-          "module:Stores.BaseStore",
-          "base:Objs",
-          "base:Iterators.ArrayIterator"
-  	], function (Queries, Constrained, BaseStore, Objs, ArrayIterator, scoped) {
-  	return BaseStore.extend({scoped: scoped}, function (inherited) {			
-  		return {
-			
-			constructor: function (first, second, options) {
-				options = Objs.extend({
-					create_options: {},
-					update_options: {},
-					delete_options: {},
-					get_options: {},
-					query_options: {}
-				}, options || {});
-				options.id_key = first._id_key;
-				this.__first = first;
-				this.__second = second;
-				inherited.constructor.call(this, options);
-				this.__create_options = Objs.extend({
-					start: "first", // "second"
-					strategy: "then", // "or", "single"
-					auto_replicate: "first" // "first", "second", "both", "none"
-				}, options.create_options);
-				this.__update_options = Objs.extend({
-					start: "first", // "second"
-					strategy: "then", // "or", "single"
-					auto_replicate: "first" // "first", "second", "both", "none"
-				}, options.update_options);
-				this.__remove_options = Objs.extend({
-					start: "first", // "second"
-					strategy: "then", // "or", "single",
-					auto_replicate: "first" // "first", "second", "both", "none"
-				}, options.delete_options);
-				this.__get_options = Objs.extend({
-					start: "first", // "second"
-					strategy: "or", // "single"
-					clone: true, // false
-					clone_second: false,
-					or_on_null: true // false
-				}, options.get_options);
-				this.__query_options = Objs.extend({
-					start: "first", // "second"
-					strategy: "or", // "single"
-					clone: true, // false
-					clone_second: false,
-					or_on_null: true // false
-				}, options.query_options);
-				this.__first.on("insert", this.__inserted_first, this);
-				this.__second.on("insert", this.__inserted_second, this);
-				this.__first.on("update", this.__updated_first, this);
-				this.__second.on("update", this.__updated_second, this);
-				this.__first.on("remove", this.__removed_first, this);
-				this.__second.on("remove", this.__removed_second, this);
-			},
-			
-			__inserted_first: function (row, event_data) {
-				if (event_data && event_data.dual_insert)
-					return;
-				if (this.__create_options.auto_replicate == "first" || this.__create_options.auto_replicate == "both")
-					this.__second.insert([row, {dual_insert: true}]);
-				this._inserted(row);
-			},
-			
-			__inserted_second: function (row, event_data) {
-				if (event_data && event_data.dual_insert)
-					return;
-				if (this.__create_options.auto_replicate == "second" || this.__create_options.auto_replicate == "both")
-					this.__first.insert([row, {dual_insert: true}]);
-				this._inserted(row);
-			},
-		
-			__updated_first: function (row, update, event_data) {
-				if (event_data && event_data.dual_update)
-					return;
-				if (this.__update_options.auto_replicate == "first" || this.__update_options.auto_replicate == "both")
-					this.__second.update(row[this.id_key()], [update, {dual_update: true}]);
-				this._updated(row, update);
-			},
-			
-			__updated_second: function (row, update, event_data) {
-				if (event_data && event_data.dual_update)
-					return;
-				if (this.__update_options.auto_replicate == "second" || this.__update_options.auto_replicate == "both")
-					this.__first.update(row[this.id_key()], [update, {dual_update: true}]);
-				this._updated(row, update);
-			},
-		
-			__removed_first: function (id, event_data) {
-				if (event_data && event_data.dual_remove)
-					return;
-				if (this.__remove_options.auto_replicate == "first" || this.__remove_options.auto_replicate == "both")
-					this.__second.remove([id, {dual_remove: true}]);
-				this._removed(id);
-			},
-			
-			__removed_second: function (id, event_data) {
-				if (event_data && event_data.dual_remove)
-					return;
-				if (this.__remove_options.auto_replicate == "second" || this.__remove_options.auto_replicate == "both")
-					this.__first.remove([id, {dual_remove: true}]);
-				this._removed(id);
-			},
-		
-			first: function () {
-				return this.__first;
-			},
-			
-			second: function () {
-				return this.__second;
-			},
-		
-			_insert: function (data) {
-				var first = this.__first;
-				var second = this.__second;
-				if (this.__create_options.start != "first") {
-					first = this.__second;
-					second = this.__first;
-				}
-				var strategy = this.__create_options.strategy;
-				if (strategy == "then")
-					return first.insert([data, {dual_insert: true}]).mapSuccess(function (row) {
-						return second.insert([row, {dual_insert: true}]);
-					}, this);
-				else if (strategy == "or")
-					return first.insert([data, {dual_insert: true}]).mapError(function () {
-						return second.insert([data, {dual_insert: true}]);
-					}, this);
-				else
-					return first.insert([data, {dual_insert: true}]);
-			},
-		
-			_update: function (id, data) {
-				var first = this.__first;
-				var second = this.__second;
-				if (this.__update_options.start != "first") {
-					first = this.__second;
-					second = this.__first;
-				}
-				var strategy = this.__update_options.strategy;
-				if (strategy == "then")
-					return first.update(id, [data, {dual_update: true}]).mapSuccess(function (row) {
-						return second.update(id, [row, {dual_update: true}]);
-					}, this);
-				else if (strategy == "or")
-					return first.update(id, [data, {dual_update: true}]).mapError(function () {
-						return second.update(id, [data, {dual_update: true}]);
-					}, this);
-				else
-					return first.update(id, [data, {dual_update: true}]);
-			},
-		
 			_remove: function (id) {
-				var first = this.__first;
-				var second = this.__second;
-				if (this.__remove_options.start != "first") {
-					first = this.__second;
-					second = this.__first;
-				}
-				var strategy = this.__remove_options.strategy;
-				if (strategy == "then")
-					return first.remove([id, {dual_remove: true}]).mapSuccess(function () {
-						return second.remove([id, {dual_remove: true}]);
-					}, this);
-				else if (strategy == "or")
-					return first.remove([id, {dual_remove: true}]).mapError(function () {
-						return second.remove([id, {dual_remove: true}]);
-					}, this);
-				else
-					return first.remove(id);
+				var key = this._idToKey[id];
+				delete this._idToKey[id];
+				if (this._options.exact)
+					this._exactMap = this.__remove(key, this._exactMap, id);
+				if (this._options.ignoreCase)
+					this._ignoreCaseMap = this.__remove(key, this._ignoreCaseMap, id);
 			},
-		
-			_query_capabilities: function () {
-				return Constrained.fullConstrainedQueryCapabilities(Queries.fullQueryCapabilities()); 
+
+			_update: function (id, key) {
+				var old_key = this._idToKey[id];
+				if (old_key == key)
+					return;
+				this._remove(id);
+				this._insert(id, key);
 			},
-		
-			_get: function (id) {
-				var first = this.__first;
-				var second = this.__second;
-				if (this.__get_options.start != "first") {
-					first = this.__second;
-					second = this.__first;
-				}
-				var strategy = this.__get_options.strategy;
-				var clone = this.__get_options.clone;
-				var clone_second = this.__get_options.clone_second;
-				var or_on_null = this.__get_options.or_on_null;
-				var result = null;
-				if (strategy == "or") {
-					return first.get(id).mapCallback(function (error, result) {
-						if (error || (!result && or_on_null))
-							return second.get(id).mapSuccess(function (result) {
-								return result && clone ? first.insert(result) : result;
-							}, this);
-						if (!clone_second)
-							return result;
-						return second.get(id).mapCallback(function (error, row) {
-							if (error || !row)
-								return second.insert(result);
-							return result;
-						}, this);
-					}, this);
-				} else
-					return first.get(id);
+
+			_iterate: function (key, direction, callback, context) {
+				TreeMap.iterate_from(key, this._exactMap, function (iterKey, value) {
+					for (var id in value) {
+						if (callback.call(context, iterKey, id) === false)
+							return false;
+					}
+					return true;
+				}, this, !direction);
+			},	
+
+			_iterate_ic: function (key, direction, callback, context) {
+				TreeMap.iterate_from(key, this._ignoreCaseMap, function (iterKey, value) {
+					for (var id in value) {
+						if (callback.call(context, iterKey, id) === false)
+							return false;
+					}
+					return true;
+				}, this, !direction);
+			},	
+
+			_key_count: function () {
+				return this._options.exact ? TreeMap.length(this._exactMap) : 0;
 			},
-		
-			_query: function (query, options) {
-				var first = this.__first;
-				var second = this.__second;
-				if (this.__query_options.start != "first") {
-					first = this.__second;
-					second = this.__first;
-				}
-				var strategy = this.__query_options.strategy;
-				var clone = this.__query_options.clone;
-				var clone_second = this.__get_options.clone_second;
-				var or_on_null = this.__query_options.or_on_null;
-				var result = null;
-				if (strategy == "or") {
-					this.trigger("query_first", query, options);
-					return first.query(query, options).mapCallback(function (error, result) {
-						if (error || (!result && or_on_null)) {
-							this.trigger("query_second", query, options);
-							return second.query(query, options).mapSuccess(function (result) {
-								if (result && clone) {
-									var arr = result.asArray();
-									return first.insert_all(arr, {query: query, options: options}, {dual_insert: true}).mapSuccess(function () {
-										return new ArrayIterator(arr);
-									});
-								}
-								return result;
-							}, this);
-						}
-						if (!clone_second)
-							return result;
-						this.trigger("query_second", query, options);
-						return second.query(query, options).mapCallback(function (error, result2) {
-							if (error || !result2) {
-								var arr = result.asArray();
-								return second.insert_all(arr, {query: query, options: options}, {dual_insert: true}).mapSuccess(function () {
-									return new ArrayIterator(arr);
-								});
-							}
-							return result;
-						}, this);
-					}, this);
-				} else {
-					this.trigger("query_first", query, options);
-					return first.query(query, options);
-				}
+
+			_key_count_ic: function () {
+				return this._options.ignoreCase ? TreeMap.length(this._ignoreCaseMap) : 0;
+			},
+
+			key_count_left_ic: function (key) {
+				return TreeMap.treeSizeLeft(key, this._ignoreCaseMap);
+			},
+
+			key_count_right_ic: function (key) {
+				return TreeMap.treeSizeRight(key, this._ignoreCaseMap);
+			},
+
+			key_count_distance_ic: function (leftKey, rightKey) {
+				return TreeMap.distance(leftKey, rightKey, this._ignoreCaseMap);
+			},
+
+			key_count_left: function (key) {
+				return TreeMap.treeSizeLeft(key, this._exactMap);
+			},
+
+			key_count_right: function (key) {
+				return TreeMap.treeSizeRight(key, this._exactMap);
+			},
+
+			key_count_distance: function (leftKey, rightKey) {
+				return TreeMap.distance(leftKey, rightKey, this._exactMap);
 			}
 
-  		};
-  	});
+		};
+	});
 });
 
-Scoped.define("module:Queries.AbstractQueryModel", [
-	    "base:Class"
-	], function (Class, scoped) {
-	return Class.extend({scoped: scoped}, {
-	
-		register: function (query) {},
-		
-		executable: function (query) {}
+/**
+ * @class QueryCollection
+ *
+ * A base class for querying collections. Subclasses specify the expected type
+ * of data store and specify whether the query collection is active.
+ */
+Scoped.define("module:Collections.QueryCollection", [      
+                                                     "base:Collections.Collection",
+                                                     "base:Objs",
+                                                     "base:Types",
+                                                     "base:Comparators",
+                                                     "base:Promise",
+                                                     "base:Class",
+                                                     "module:Queries.Constrained",
+                                                     "module:Queries"
+                                                     ], function (Collection, Objs, Types, Comparators, Promise, Class, Constrained, Queries, scoped) {
+	return Collection.extend({scoped: scoped}, function (inherited) {
+		return {
 
+			/**
+		       * @method constructor
+		       *
+		       * @param {object} source The source object
+		       * can either be an instance of a Table
+		       * or a Store. A Table should be used if validations and other data
+		       * processing methods are desired. A Store is sufficient if just
+		       * performing simple queries and returning the results with little
+		       * manipulation.
+		       *
+		       * @param {object} query The query object contains keys specifying query
+		       * parameters and values specifying their respective values. This query
+		       * object can be updated later with the `set_query` method.
+		       *
+		       * @param {object} options The options object contains keys specifying
+		       * option parameters and values specifying their respective values.
+		       *
+		       * @return {QueryCollection} A new instance of QueryCollection.
+		       */
+			constructor: function (source, query, options) {
+				inherited.constructor.call(this);
+				options = options || {};
+				this._id_key = this._id_key || options.id_key || "id";
+				this._source = source;
+				this._complete = false;
+				this._active = options.active || false;
+				this._incremental = "incremental" in options ? options.incremental : true; 
+				this._active_bounds = "active_bounds" in options ? options.active_bounds : true;
+				this._enabled = false;
+				this._range = options.range || null;
+				this._forward_steps = options.forward_steps || null;
+				this._backward_steps = options.backward_steps || null;
+				if (this._active) {
+					this.on("add", function (object) {
+						this._watchItem(object.get(this._id_key));
+					}, this);
+					this.on("remove", function (object) {
+						this._unwatchItem(object.get(this._id_key));
+					}, this);
+				}
+				this._query = {
+					query: {},
+					options: {
+						skip: 0,
+						limit: null,
+						sort: null
+					}
+				};
+				query = query || {};
+				this.update(query.query ? query : {
+					query: query,
+					options: {
+						skip: options.skip || 0,
+						limit: options.limit || options.range || null,
+						sort: options.sort || null
+					}
+				});
+				if (options.auto)
+					this.enable();
+			},
+
+			destroy: function () {
+				this.disable();
+				if (this._watcher()) {
+					this._watcher()._unwatchInsert(null, this);
+					this._watcher()._unwatchItem(null, this);
+				}
+				inherited.destroy.call(this);
+			},
+
+			
+		      /**
+		       * @method paginate
+		       *
+		       * Paginate to a specific page.
+		       *
+		       * @param {int} index The page to paginate to.
+		       *
+		       * @return {Promise} Promise from query execution.
+		       */
+			
+			paginate: function (index) {
+				return this.update({options: {
+					skip: index * this._range,
+					limit: this._range
+				}});
+			},
+			
+		      /**
+		       * @method paginate_index
+		       *
+		       * @return {int} Current pagination page.
+		       */
+			paginate_index: function () {
+				return Math.floor(this.getSkip() / this._range);
+			},
+			
+		      /**
+		       * @method paginate_next
+		       *
+		       * Update the query to paginate to the next page.
+		       *
+		       * @return {Promise} Promise of the query.
+		       */
+			paginate_next: function () {
+				return this.isComplete() ? Promise.create(true) : this.paginate(this.paginate_index() + 1);
+			},
+			
+	      /**
+	       * @method paginate_prev
+	       *
+	       * Update the query to paginate to the previous page.
+	       *
+	       * @return {Promise} Promise of the query.
+	       */
+			paginate_prev: function () {
+				return this.paginate_index() > 0 ? this.paginate(this.paginate_index() - 1) : Promise.create(true);
+			},		
+			
+			increase_forwards: function (steps) {
+				steps = steps || this._forward_steps;
+				return this.isComplete() ? Promise.create(true) : this.update({options: {
+					limit: this.getLimit() + steps
+				}});
+			},
+
+			increase_backwards: function (steps) {
+				steps = steps || this._backward_steps;
+				return !this.getSkip() ? Promise.create(true) : this.update({options: {
+					skip: Math.max(this.getSkip() - steps, 0),
+					limit: this.getLimit() ? this.getLimit() + this.getSkip() - Math.max(this.getSkip() - steps, 0) : null  
+				}});
+			},
+			
+
+			get_ident: function (obj) {
+				return Class.is_class_instance(obj) ? obj.get(this._id_key) : obj[this._id_key];
+			},
+
+			getQuery: function () {
+				return this._query;
+			},
+
+			getSkip: function () {
+				return this._query.options.skip || 0;
+			},
+
+			getLimit: function () {
+				return this._query.options.limit || null;
+			},
+
+		      /**
+		       * @method update
+		       *
+		       * Update the collection with a new query. Setting the query not only
+		       * updates the query field, but also updates the data with the results of
+		       * the new query.
+		       *
+		       * @param {object} constrainedQuery The new query for this collection.
+		       *
+		       * @example
+		       * // Updates the query dictating the collection contents.
+		       * collectionQuery.update({query: {'queryField': 'queryValue'}, options: {skip: 10}});
+		       */
+			update: function (constrainedQuery) {
+				constrainedQuery = Constrained.rectify(constrainedQuery);
+				var currentSkip = this._query.options.skip || 0;
+				var currentLimit = this._query.options.limit || null;
+				if (constrainedQuery.query)
+					this._query.query = constrainedQuery.query;
+				this._query.options = Objs.extend(this._query.options, constrainedQuery.options);
+				if (!this._enabled)
+					return Promise.create(true);
+				if (constrainedQuery.query || "sort" in constrainedQuery.options || !this._incremental)					
+					return this.refresh();
+				var nextSkip = "skip" in constrainedQuery.options ? constrainedQuery.options.skip || 0 : currentSkip;
+				var nextLimit = "limit" in constrainedQuery.options ? constrainedQuery.options.limit || null : currentLimit;
+				if (nextSkip === currentSkip && nextLimit === currentLimit)
+					return Promise.create(true);
+				// No overlap
+				if ((nextLimit && nextSkip + nextLimit <= currentSkip) || (currentLimit && currentSkip + currentLimit <= nextSkip))
+					return this.refresh();
+				// Make sure that currentSkip >= nextSkip
+				while (currentSkip < nextSkip && (currentLimit === null || currentLimit > 0)) {
+					this.remove(this.getByIndex(0));
+					currentSkip++;
+					currentLimit--;
+				}
+				var promise = Promise.create(true);
+				// Make sure that nextSkip === currentSkip
+				if (nextSkip < currentSkip) {
+					var leftLimit = currentSkip - nextSkip;
+					if (nextLimit !== null)
+						leftLimit = Math.min(leftLimit, nextLimit);
+					promise = this._execute(Objs.tree_extend({options: {
+						skip: nextSkip,
+						limit: leftLimit    
+					}}, this._query, 2));
+					nextSkip += leftLimit;
+					if (nextLimit !== null)
+						nextLimit -= leftLimit;
+				}
+				if (!currentLimit || (nextLimit && nextLimit <= currentLimit)) {
+					if (nextLimit)
+						while (this.count() > nextLimit)
+							this.remove(this.getByIndex(this.count() - 1));
+					return promise;
+				}
+				return promise.and(this._execute(Objs.tree_extend({
+					options: {
+						skip: currentSkip + currentLimit,
+						limit: !nextLimit ? null : nextLimit - currentLimit
+					}
+				}, this._query, 2)));
+			},
+
+			enable: function () {
+				if (this._enabled)
+					return;
+				this._enabled = true;
+				this.refresh();
+			},
+
+			disable: function () {
+				if (!this._enabled)
+					return;
+				this._enabled = false;
+				this.clear();
+				this._unwatchInsert();
+			},
+
+			refresh: function (clear) {
+				if (clear)
+					this.clear();
+				if (this._query.options.sort && !Types.is_empty(this._query.options.sort))
+					this.set_compare(Comparators.byObject(this._query.options.sort));
+				else
+					this.set_compare(null);
+				this._unwatchInsert();
+				if (this._active)
+					this._watchInsert(this._query.query);
+				return this._execute(this._query);
+			},
+
+			isEnabled: function () {
+				return this._enabled;
+			},
+
+		      /**
+		       * @method _execute
+		       *
+		       * Execute a constrained query. This method is called whenever a new query is set.
+		       * Doesn't override previous reults.
+		       *
+		       * @protected
+		       *
+		       * @param {constrainedQuery} constrainedQuery The constrained query that should be executed
+		       *
+		       * @return {Promise} Promise from executing query.
+		       */
+			_execute: function (constrainedQuery) {
+				var limit = constrainedQuery.options.limit;
+				return this._subExecute(constrainedQuery.query, constrainedQuery.options).mapSuccess(function (iter) {
+					var result = iter.asArray();
+					this._complete = limit === null || result.length < limit;
+					this.replace_objects(result);
+					return true;
+				}, this);
+			},
+
+		      /**
+		       * @method _sub_execute
+		       *
+		       * Run the specified query on the data source.
+		       *
+		       * @private
+		       *
+		       * @param {object} options The options for the subquery.
+		       *
+		       * @return {object} Iteratable object containing query results.
+		       */
+			_subExecute: function (query, options) {
+				return this._source.query(query, options);
+			},
+
+		      /**
+		       * @method isComplete
+		       *
+		       * @return {boolean} Return value indicates if the query has finished/if
+		       * data has been returned.
+		       */
+			isComplete: function () {
+				return this._complete;
+			},
+			
+			isValid: function (data) {
+				return Queries.evaluate(this._query.query, data);
+			},
+
+			_materialize: function (data) {
+				return data;
+			},
+
+			_activeCreate: function (data) {
+				if (!this._active || !this._enabled)
+					return;
+				if (!this.isValid(data))
+					return;
+				this.add(this._materialize(data));
+				if (this._query.options.limit && this.count() > this._query.options.limit) {
+					if (this._active_bounds)
+						this._query.options.limit++;
+					else
+						this.remove(this.getByIndex(this.count() - 1));
+				}
+			},
+
+			_activeRemove: function (id) {
+				if (!this._active || !this._enabled)
+					return;
+				var object = this.getById(id);
+				if (!object)
+					return;
+				this.remove(object);
+				if (this._query.options.limit !== null) {
+					if (this._active_bounds)
+						this._query.options.limit--;
+				}
+			},
+
+			_activeUpdate: function (id, data, row) {
+				if (!this._active || !this._enabled)
+					return;
+				var object = this.getById(id);
+				var merged = Objs.extend(row, data);
+				if (!object)
+					this._activeCreate(merged);
+				else if (!this.isValid(merged))
+					this._activeRemove(id);
+				else
+					object.setAll(data);
+			},
+
+			_watcher: function () {
+				return null;
+			},
+			
+			_watchInsert: function (query) {
+				if (this._watcher())
+					this._watcher().watchInsert(query, this);
+			},
+
+			_unwatchInsert: function () {
+				if (this._watcher())
+					this._watcher().unwatchInsert(null, this);
+			},
+			
+			_watchItem: function (id) {
+				if (this._watcher())
+					this._watcher().watchItem(id, this);
+			},
+			
+			_unwatchItem: function (id) {
+				if (this._watcher())
+					this._watcher().unwatchItem(id, this);
+			}			
+
+		};
 	});
 });
 
 
-Scoped.define("module:Queries.DefaultQueryModel", [
-        "module:Queries.AbstractQueryModel",
-        "module:Queries.Constrained",
-        "base:Objs"
-    ], function (AbstractQueryModel, Constrained, Objs, scoped) {
-    return AbstractQueryModel.extend({scoped: scoped}, function (inherited) {
+
+
+Scoped.define("module:Collections.StoreQueryCollection", [      
+                                                          "module:Collections.QueryCollection",
+                                                          "base:Objs"
+                                                          ], function (QueryCollection, Objs, scoped) {
+	return QueryCollection.extend({scoped: scoped}, function (inherited) {
 		return {
-					
-			constructor: function () {
-				inherited.constructor.call(this);
-		        this.__queries = {};    
+
+			constructor: function (source, query, options) {
+				inherited.constructor.call(this, source, query, Objs.extend({
+					id_key: source.id_key()
+				}, options));
+				this._source = source;
+				source.on("insert", this._activeCreate, this);
+				source.on("remove", this._activeRemove, this);
+				source.on("update", function (row, data) {
+					this._activeUpdate(source.id_of(row), data, row);
+				}, this);
+			},
+
+			destroy: function () {
+				this._source.off(null, null, this);
+				inherited.destroy.call(this);
+			},
+
+			get_ident: function (obj) {
+				return obj.get(this._source.id_key());
 			},
 			
-			_insert: function (query) {
-				this.__queries[Constrained.serialize(query)] = query;
-			},
-			
-			_remove: function (query) {
-				delete this.__queries[Constrained.serialize(query)];
-			},
-			
-			exists: function (query) {
-				return Constrained.serialize(query) in this.__queries;
-			},
-			
-			subsumizer_of: function (query) {
-		        if (this.exists(query))
-		            return query;
-		        var result = null;
-		        Objs.iter(this.__queries, function (query2) {
-		            if (Constrained.subsumizes(query2, query))
-		                result = query2;
-		            return !result;
-		        }, this);
-		        return result;
-			},
-			
-			executable: function (query) {
-			    return !!this.subsumizer_of(query);
-			},
-			
-			register: function (query) {
-				var changed = true;
-				var check = function (query2) {
-					if (Constrained.subsumizes(query, query2)) {
-						this._remove(query2);
-						changed = true;
-					}/* else if (Constrained.mergeable(query, query2)) {
-						this._remove(query2);
-						changed = true;
-						query = Constrained.merge(query, query2);
-					} */
-				};
-				while (changed) {
-					changed = false;
-					Objs.iter(this.__queries, check, this);
-				}
-				this._insert(query);
-			},
-			
-			invalidate: function (query) {
-			    var subsumizer = this.subsumizer_of(query);
-			    if (subsumizer)
-			       this._remove(subsumizer);
+			_watcher: function () {
+				return this._source.watcher();
 			}
-	
+
 		};
-    });
+	});
 });
 
+Scoped.define("module:Collections.TableQueryCollection", [      
+                                                          "module:Collections.QueryCollection",
+                                                          "base:Objs"
+                                                          ], function (QueryCollection, Objs, scoped) {
+	return QueryCollection.extend({scoped: scoped}, function (inherited) {
+		return {
 
-Scoped.define("module:Queries.StoreQueryModel", [
-       "module:Queries.DefaultQueryModel",
-       "module:Queries.Constrained"
-   ], function (DefaultQueryModel, Constrained, scoped) {
-   return DefaultQueryModel.extend({scoped: scoped}, function (inherited) {
-	   return {
-			
-			constructor: function (store) {
-		        this.__store = store;
-		        inherited.constructor.call(this);
+			constructor: function (source, query, options) {
+				inherited.constructor.call(this, source, query, Objs.extend({
+					id_key: source.primary_key()
+				}, options));
+				source.on("create", this._activeCreate, this);
+				source.on("remove", this._activeRemove, this);
+				source.on("update", this._activeUpdate, this);
+			},
+
+			destroy: function () {
+				this._source.off(null, null, this);
+				inherited.destroy.call(this);
+			},
+
+			_materialize: function (data) {
+				return this._source.materialize(data);
 			},
 			
-			initialize: function () {
-				return this.__store.mapSuccess(function (result) {
-					while (result.hasNext()) {
-						var query = result.next();
-						delete query.id;
-		                this._insert(query);
-					}
-				}, this);
-			},
-			
-			_insert: function (query) {
-				inherited._insert.call(this, query);
-				this.__store.insert(query);
-			},
-			
-			_remove: function (query) {
-				delete this.__queries[Constrained.serialize(query)];
-				this.__store.query({query: query}).success(function (result) {
-					while (result.hasNext())
-						this.__store.remove(result.next().id);
-				}, this);
+			_watcher: function () {
+				return this._source.store().watcher();
 			}
 
-	    };
-    });
+		};
+	});
 });
+
+
 
 Scoped.define("module:Modelling.ModelException", [
-          "base:Exceptions.Exception"
-  	], function (Exception, scoped) {
-  	return Exception.extend({scoped: scoped}, function (inherited) {			
-  		return {
-			
+                                                  "base:Exceptions.Exception"
+                                                  ], function (Exception, scoped) {
+	return Exception.extend({scoped: scoped}, function (inherited) {			
+		return {
+
 			constructor: function (model, message) {
 				inherited.constructor.call(this, message);
 				this.__model = model;
 			},
-			
+
 			model: function () {
 				return this.__model;
 			}
-	
-  		};
-  	});
+
+		};
+	});
 });
 
 
 Scoped.define("module:Modelling.ModelMissingIdException", [
-          "module:Modelling.ModelException"
-  	], function (Exception, scoped) {
-  	return Exception.extend({scoped: scoped}, function (inherited) {			
-  		return {
-			
+                                                           "module:Modelling.ModelException"
+                                                           ], function (Exception, scoped) {
+	return Exception.extend({scoped: scoped}, function (inherited) {			
+		return {
+
 			constructor: function (model) {
 				inherited.constructor.call(this, model, "No id given.");
 			}
 
-  		};
-  	});
+		};
+	});
 });
 
 
 Scoped.define("module:Modelling.ModelInvalidException", [
-           "module:Modelling.ModelException",
-           "base:Objs"
-   	], function (Exception, Objs, scoped) {
-   	return Exception.extend({scoped: scoped}, function (inherited) {			
-   		return {
- 			
-   			constructor: function (model) {
-   				var message = Objs.values(model.errors()).join("\n");
- 				inherited.constructor.call(this, model, message);
- 			}
+                                                         "module:Modelling.ModelException",
+                                                         "base:Objs"
+                                                         ], function (Exception, Objs, scoped) {
+	return Exception.extend({scoped: scoped}, function (inherited) {			
+		return {
 
-   		};
-   	});
- });
+			constructor: function (model) {
+				var message = Objs.values(model.errors()).join("\n");
+				inherited.constructor.call(this, model, message);
+			}
+
+		};
+	});
+});
 
 Scoped.define("module:Modelling.Model", [
-          "module:Modelling.AssociatedProperties",
-          "module:Modelling.ModelInvalidException",
-          "base:Objs",
-          "base:Promise",
-          "base:Types",
-          "base:Exceptions"
-  	], function (AssociatedProperties, ModelInvalidException, Objs, Promise, Types, Exceptions, scoped) {
-  	return AssociatedProperties.extend({scoped: scoped}, function (inherited) {			
-  		return {
+                                         "module:Modelling.AssociatedProperties",
+                                         "module:Modelling.ModelInvalidException",
+                                         "base:Objs",
+                                         "base:Promise",
+                                         "base:Types",
+                                         "base:Exceptions"
+                                         ], function (AssociatedProperties, ModelInvalidException, Objs, Promise, Types, Exceptions, scoped) {
+	return AssociatedProperties.extend({scoped: scoped}, function (inherited) {			
+		return {
 
 			constructor: function (attributes, table, options) {
 				this.__table = table;
@@ -2829,34 +4073,34 @@ Scoped.define("module:Modelling.Model", [
 				if (this.option("auto_create") && this.isNew())
 					this.save();
 			},
-			
+
 			destroy: function () {
 				this.__table.off(null, null, this);
 				this.trigger("destroy");
 				inherited.destroy.call(this);
 			},
-			
+
 			option: function (key) {
 				var opts = key in this.__options ? this.__options : this.table().options();
 				return opts[key];
 			},
-			
+
 			table: function () {
 				return this.__table;
 			},
-			
+
 			isSaved: function () {
 				return this.isRemoved() || (!this.isNew() && !this.isChanged());
 			},
-			
+
 			isNew: function () {
 				return this.option("newModel");
 			},
-			
+
 			isRemoved: function () {
 				return this.option("removed");
 			},
-		
+
 			_registerEvents: function () {
 				this.__table.on("update:" + this.id(), function (data) {
 					if (this.isRemoved())
@@ -2875,14 +4119,14 @@ Scoped.define("module:Modelling.Model", [
 					this.__options.removed = true;
 				}, this);
 			},
-			
+
 			update: function (data) {
 				this.__silent++;
 				this.setAll(data);
 				this.__silent--;
 				return this.isNew() ? Promise.create(true) : this.save();
 			},
-		
+
 			_afterSet: function (key, value, old_value, options) {
 				inherited._afterSet.call(this, key, value, old_value, options);
 				var scheme = this.cls.scheme();
@@ -2891,7 +4135,7 @@ Scoped.define("module:Modelling.Model", [
 				if (this.option("auto_update") && !this.isNew())
 					this.save();
 			},
-			
+
 			save: function () {
 				if (this.isRemoved())
 					return Promise.create({});
@@ -2927,7 +4171,7 @@ Scoped.define("module:Modelling.Model", [
 					}, this);
 				}, this);
 			},
-			
+
 			remove: function () {
 				if (this.isNew() || this.isRemoved())
 					return Promise.create(true);
@@ -2937,21 +4181,21 @@ Scoped.define("module:Modelling.Model", [
 					return result;
 				}, this);
 			}	
-	
-  		};
-  	});
+
+		};
+	});
 });
 Scoped.define("module:Modelling.SchemedProperties", [
-          "base:Properties.Properties",
-          "base:Types",
-          "base:Promise",
-          "base:Objs",
-          "module:Stores.RemoteStoreException",
-          "base:Net.HttpHeader",
-          "module:Modelling.ModelInvalidException"
-  	], function (Properties, Types, Promise, Objs, RemoteStoreException, HttpHeader, ModelInvalidException, scoped) {
-  	return Properties.extend({scoped: scoped}, function (inherited) {			
-  		return {
+                                                     "base:Properties.Properties",
+                                                     "base:Types",
+                                                     "base:Promise",
+                                                     "base:Objs",
+                                                     "module:Stores.RemoteStoreException",
+                                                     "base:Net.HttpHeader",
+                                                     "module:Modelling.ModelInvalidException"
+                                                     ], function (Properties, Types, Promise, Objs, RemoteStoreException, HttpHeader, ModelInvalidException, scoped) {
+	return Properties.extend({scoped: scoped}, function (inherited) {			
+		return {
 
 			constructor: function (attributes) {
 				inherited.constructor.call(this);
@@ -2971,11 +4215,11 @@ Scoped.define("module:Modelling.SchemedProperties", [
 				for (key in attributes)
 					this.set(key, attributes[key]);
 			},
-			
+
 			_unsetChanged: function (key) {
 				delete this._properties_changed[key];
 			},
-			
+
 			_beforeSet: function (key, value) {
 				var scheme = this.cls.scheme();
 				if (!(key in scheme))
@@ -2987,7 +4231,7 @@ Scoped.define("module:Modelling.SchemedProperties", [
 					value = sch.transform.apply(this, [value]);
 				return value;
 			},
-			
+
 			_afterSet: function (key, value) {
 				var scheme = this.cls.scheme();
 				if (!(key in scheme))
@@ -2999,15 +4243,15 @@ Scoped.define("module:Modelling.SchemedProperties", [
 					f.apply(this, [value]);
 				}
 			},
-			
+
 			isChanged: function () {
 				return !Types.is_empty(this._properties_changed);
 			},
-		
+
 			properties_changed: function () {
 				return this._properties_changed;
 			},
-			
+
 			get_all_properties: function () {
 				var result = {};
 				var scheme = this.cls.scheme();
@@ -3015,7 +4259,7 @@ Scoped.define("module:Modelling.SchemedProperties", [
 					result[key] = this.get(key);
 				return result;
 			},
-			
+
 			validate: function () {
 				this.trigger("validate");
 				var promises = [];
@@ -3030,11 +4274,11 @@ Scoped.define("module:Modelling.SchemedProperties", [
 					return valid;
 				});
 			},
-			
+
 			_customValidate: function () {
 				return true;
 			},
-			
+
 			_validateAttr: function (attr) {
 				delete this.__errors[attr];
 				var scheme = this.cls.scheme();
@@ -3061,20 +4305,20 @@ Scoped.define("module:Modelling.SchemedProperties", [
 					return valid;
 				}, this);
 			},
-			
+
 			setError: function (attr, error) {
 				this.__errors[attr] = error;
 				this.trigger("validate:" + attr, !(attr in this.__errors), this.__errors[attr]);
 			},
-			
+
 			errors: function () {
 				return this.__errors;
 			},
-			
+
 			getError: function (attr) {
 				return this.__errors[attr];
 			},
-			
+
 			asRecord: function (tags) {
 				var rec = {};
 				var scheme = this.cls.scheme();
@@ -3098,7 +4342,7 @@ Scoped.define("module:Modelling.SchemedProperties", [
 						asInner.call(this, key);
 				return rec;		
 			},
-			
+
 			setByTags: function (data, tags) {
 				var scheme = this.cls.scheme();
 				tags = tags || {};
@@ -3119,7 +4363,7 @@ Scoped.define("module:Modelling.SchemedProperties", [
 					if (key in scheme)
 						setInner.call(this, key);
 			},
-			
+
 			validation_exception_conversion: function (e) {
 				var source = e;
 				if ("instance_of" in e && e.instance_of(RemoteStoreException))
@@ -3134,20 +4378,20 @@ Scoped.define("module:Modelling.SchemedProperties", [
 				}
 				return e;		
 			}
-			
-  		};
+
+		};
 	}, {
-	
+
 		_initializeScheme: function () {
 			return {};
 		},
-		
+
 		asRecords: function (arr, tags) {
 			return arr.map(function (item) {
 				return item.asRecord(tags);
 			});
 		},
-		
+
 		filterPersistent: function (obj) {
 			var result = {};
 			var scheme = this.scheme();
@@ -3157,87 +4401,87 @@ Scoped.define("module:Modelling.SchemedProperties", [
 			}
 			return result;
 		}
-		
+
 	}, {
-		
+
 		scheme: function () {
 			this.__scheme = this.__scheme || this._initializeScheme();
 			return this.__scheme;
 		}
-		
+
 	});
 });
 
 
 Scoped.define("module:Modelling.AssociatedProperties", [
-         "module:Modelling.SchemedProperties"
- 	], function (SchemedProperties, scoped) {
- 	return SchemedProperties.extend({scoped: scoped}, function (inherited) {			
- 		return {
-			
+                                                        "module:Modelling.SchemedProperties"
+                                                        ], function (SchemedProperties, scoped) {
+	return SchemedProperties.extend({scoped: scoped}, function (inherited) {			
+		return {
+
 			constructor: function (attributes) {
 				inherited.constructor.call(this, attributes);
 				this.assocs = this._initializeAssociations();
 				for (var key in this.assocs)
 					this.__addAssoc(key, this.assocs[key]);
 			},
-			
+
 			__addAssoc: function (key, obj) {
 				this[key] = function () {
 					return obj.execute.apply(obj, arguments);
 				};
 			},
-			
+
 			_initializeAssociations: function () {
 				return {};
 			},
-			
+
 			destroy: function () {
 				for (var key in this.assocs)
 					this.assocs[key].destroy();
 				inherited.destroy.call(this);
 			},
-		
+
 			id: function () {
 				return this.get(this.cls.primary_key());
 			},
-			
+
 			hasId: function () {
 				return this.has(this.cls.primary_key());
 			}
-			
+
 		};
-		
- 	}, {
-	
+
+	}, {
+
 		primary_key: function () {
 			return "id";
 		},
-		
+
 		_initializeScheme: function () {
 			var s = {};
 			s[this.primary_key()] = {
-				type: "id",
-				tags: ["read"],
-				
-				after_set: null,
-				persistent: true
+					type: "id",
+					tags: ["read"],
+
+					after_set: null,
+					persistent: true
 			};
 			return s;
 		}
-		
- 	});
+
+	});
 });
 Scoped.define("module:Modelling.Table", [
-          "base:Class",
-          "base:Events.EventsMixin",
-          "base:Objs",
-          "base:Types",
-          "base:Iterators.MappedIterator"
-  	], function (Class, EventsMixin, Objs, Types, MappedIterator, scoped) {
-  	return Class.extend({scoped: scoped}, [EventsMixin, function (inherited) {			
-  		return {
-		
+                                         "base:Class",
+                                         "base:Events.EventsMixin",
+                                         "base:Objs",
+                                         "base:Types",
+                                         "base:Iterators.MappedIterator"
+                                         ], function (Class, EventsMixin, Objs, Types, MappedIterator, scoped) {
+	return Class.extend({scoped: scoped}, [EventsMixin, function (inherited) {			
+		return {
+
 			constructor: function (store, model_type, options) {
 				inherited.constructor.call(this);
 				this.__store = store;
@@ -3253,7 +4497,7 @@ Scoped.define("module:Modelling.Table", [
 					save_invalid: false
 				}, options || {});
 				this.__store.on("insert", function (obj) {
-					this.trigger("create", obj, this.materializer(obj));
+					this.trigger("create", obj);
 				}, this);
 				this.__store.on("update", function (row, data) {
 					var id = row[this.primary_key()];
@@ -3265,12 +4509,12 @@ Scoped.define("module:Modelling.Table", [
 					this.trigger("remove:" + id);
 				}, this);
 			},
-			
+
 			modelClass: function (cls) {
 				cls = cls || this.__model_type;
 				return Types.is_string(cls) ? Scoped.getGlobal(cls) : cls;
 			},
-			
+
 			newModel: function (attributes, cls) {
 				cls = this.modelClass(cls);
 				var model = new cls(attributes, this);
@@ -3278,32 +4522,32 @@ Scoped.define("module:Modelling.Table", [
 					model.save();
 				return model;
 			},
-			
+
 			materialize: function (obj) {
 				if (!obj)
 					return null;
 				var cls = this.modelClass(this.__options.type_column && obj[this.__options.type_column] ? this.__options.type_column : null);
 				return new cls(obj, this, {newModel: false});
 			},
-			
+
 			options: function () {
 				return this.__options;
 			},
-			
+
 			store: function () {
 				return this.__store;
 			},
-			
+
 			findById: function (id) {
 				return this.__store.get(id).mapSuccess(this.materialize, this);
 			},
-		
+
 			findBy: function (query) {
 				return this.allBy(query, {limit: 1}).mapSuccess(function (iter) {
 					return iter.next();
 				});
 			},
-		
+
 			allBy: function (query, options) {
 				return this.__store.query(query, options).mapSuccess(function (iterator) {
 					return new MappedIterator(iterator, function (obj) {
@@ -3311,24 +4555,24 @@ Scoped.define("module:Modelling.Table", [
 					}, this);
 				}, this);
 			},
-			
+
 			primary_key: function () {
 				return (Types.is_string(this.__model_type) ? Scoped.getGlobal(this.__model_type) : this.__model_type).primary_key();
 			},
-			
+
 			all: function (options) {
 				return this.allBy({}, options);
 			},
-			
+
 			query: function () {
 				// Alias
 				return this.allBy.apply(this, arguments);
 			},
-		
+
 			scheme: function () {
 				return this.__model_type.scheme();
 			},
-			
+
 			ensure_indices: function () {
 				if (!("ensure_index" in this.__store))
 					return false;
@@ -3338,63 +4582,56 @@ Scoped.define("module:Modelling.Table", [
 						this.__store.ensure_index(key);
 				}
 				return true;
-			},
-			
-			materializer: function (obj) {
-				var self = this;
-				return function () {
-					return self.materialize(obj);
-				};
 			}
-			
-  		};
-  	}]);
+
+		};
+	}]);
 });
 Scoped.define("module:Modelling.Associations.Association", [
-        "base:Class",
-        "base:Promise",
-        "base:Iterators"
-    ], function (Class, Promise, Iterators, scoped) {
-    return Class.extend({scoped: scoped}, function (inherited) {
+                                                            "base:Class",
+                                                            "base:Promise",
+                                                            "base:Iterators"
+                                                            ], function (Class, Promise, Iterators, scoped) {
+	return Class.extend({scoped: scoped}, function (inherited) {
 		return {
-		
-		  	constructor: function (model, options) {
-		  		inherited.constructor.call(this);
-		  		this._model = model;
-		  		this._options = options || {};
-		  		if (options.delete_cascade) {
-		  			model.on("remove", function () {
-		  				this.__delete_cascade();
-		  			}, this);
-		  		}
-		  	},
-		  	
-		  	__delete_cascade: function () {
-		  		this.execute().success(function (iter) {
+
+			constructor: function (model, options) {
+				inherited.constructor.call(this);
+				this._model = model;
+				this._options = options || {};
+				if (options.delete_cascade) {
+					model.on("remove", function () {
+						this.__delete_cascade();
+					}, this);
+				}
+			},
+
+			__delete_cascade: function () {
+				this.execute().success(function (iter) {
 					iter = Iterators.ensure(iter);
 					while (iter.hasNext())
 						iter.next().remove({});
-		  		}, this);
-		  	},
-		  	
-		  	execute: function () {
-		  		if ("__cache" in this)
-		  			return Promise.create(this.__cache);
-		  		var promise = this._execute();
-		  		if (this._options.cached) {
-		  			promise.callback(function (error, value) {
-		  				this.__cache = error ? null : value;
-		  			}, this);
-		  		}
-		  		return promise;
-		  	},
-		  	
-		  	invalidate: function () {
-		  		delete this.__cache;
-		  	}
+				}, this);
+			},
+
+			execute: function () {
+				if ("__cache" in this)
+					return Promise.create(this.__cache);
+				var promise = this._execute();
+				if (this._options.cached) {
+					promise.callback(function (error, value) {
+						this.__cache = error ? null : value;
+					}, this);
+				}
+				return promise;
+			},
+
+			invalidate: function () {
+				delete this.__cache;
+			}
 
 		};
-    });
+	});
 });
 Scoped.define("module:Modelling.Associations.BelongsToAssociation", [
         "module:Modelling.Associations.TableAssociation",
@@ -3417,29 +4654,29 @@ Scoped.define("module:Modelling.Associations.BelongsToAssociation", [
     });
 });
 Scoped.define("module:Modelling.Associations.ConditionalAssociation", [
-        "module:Modelling.Associations.Associations",
-        "base:Objs"
-    ], function (Associations, Objs, scoped) {
-    return Associations.extend({scoped: scoped}, function (inherited) {
+                                                                       "module:Modelling.Associations.Associations",
+                                                                       "base:Objs"
+                                                                       ], function (Associations, Objs, scoped) {
+	return Associations.extend({scoped: scoped}, function (inherited) {
 		return {
-		
-		  	constructor: function (model, options) {
-		  		inherited.constructor.call(this, model, Objs.extend({
-		  			conditional: function () { return true; }
-		  		}, options));
-		  	},
-	
+
+			constructor: function (model, options) {
+				inherited.constructor.call(this, model, Objs.extend({
+					conditional: function () { return true; }
+				}, options));
+			},
+
 			_execute: function () {
 				var assoc = this.assoc();
 				return assoc.execute.apply(assoc, arguments);
 			},
-			
+
 			assoc: function () {
 				return this._model.assocs[this._options.conditional(this._model)];
 			}
-		
+
 		};
-    });
+	});
 });
 Scoped.define("module:Modelling.Associations.HasManyAssociation", [
         "module:Modelling.Associations.TableAssociation",

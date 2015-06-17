@@ -1,5 +1,5 @@
 /*!
-betajs-server - v1.0.0 - 2015-05-07
+betajs-server - v1.0.0 - 2015-06-17
 Copyright (c) Oliver Friedmann
 MIT Software License.
 */
@@ -537,7 +537,7 @@ Public.exports();
 	return Public;
 }).call(this);
 /*!
-betajs-server - v1.0.0 - 2015-05-07
+betajs-server - v1.0.0 - 2015-06-17
 Copyright (c) Oliver Friedmann
 MIT Software License.
 */
@@ -553,7 +553,7 @@ Scoped.binding("data", "global:BetaJS.Data");
 Scoped.define("module:", function () {
 	return {
 		guid: "9955100d-6a88-451f-9a85-004523eb8589",
-		version: '17.1431044819839'
+		version: '18.1434580668598'
 	};
 });
 
@@ -1864,7 +1864,7 @@ Scoped.define("module:Databases.MongoDatabaseTable", [
 		_insertRow: function (row) {
 			return this.table().mapSuccess(function (table) {
 				return Promise.funcCallback(table, table.insert, row).mapSuccess(function (result) {
-					return result[0] ? result[0] : result;
+					return row;
 				}, this);
 			}, this);
 		},
@@ -2157,51 +2157,52 @@ Scoped.define("module:Stores.Migrator", [
 });
 
 Scoped.define("module:Stores.MongoDatabaseStore", [
-        "data:Stores.ConversionStore",
+        "data:Stores.TransformationStore",
         "base:Objs",                                                   
         "module:Stores.DatabaseStore"
-    ], function (ConversionStore, Objs, DatabaseStore, scoped) {
-    return ConversionStore.extend({scoped: scoped}, function (inherited) {
+    ], function (TransformationStore, Objs, DatabaseStore, scoped) {
+    return TransformationStore.extend({scoped: scoped}, function (inherited) {
 		return {
 			
 			constructor: function (database, table_name, types, foreign_id) {
 				var store = new DatabaseStore(database, table_name, foreign_id);
-				var encoding = {};
-				var decoding = {};
-				types = types || {};
-		        var ObjectId = database.mongo_object_id();
+				this._types = types || {};
 		        if (!foreign_id)
-				    types.id = "id";
-		        Objs.iter(types, function (keyValue, key) {
-					if (keyValue == "id") {
-						encoding[key] = function (value) {
-							return value ? new ObjectId(value + "") : null;
-						};
-						decoding[key] = function (value) {
-							return value ? value + "" : null;
-						};
-					}
-		        }, this);
-				var opts = {
-		            value_encoding: encoding,
-		            value_decoding: decoding
-				};
-				if (foreign_id) {
-				    opts.key_encoding = {
-				        "id": foreign_id
-				    };
-				    opts.key_encoding[foreign_id] = null;
-		            opts.key_decoding = {
-		                "id": null
-		            };
-		            opts.key_encoding[foreign_id] = "id";
-				}
-				inherited.constructor.call(this, store, opts);
+				    this._types.id = "id";
+		        this._foreign_id = foreign_id;
+		        this._ObjectId = database.mongo_object_id();
+				inherited.constructor.call(this, store);
 			},
 			
 			table: function () {
 				return this.store().table();
-			}
+			},
+			
+			_encodeData: function (data) {
+				var result = Objs.map(data, function (value, key) {
+					if (this._types[key] === "id")
+						return value ? new this._ObjectId(value + "") : null;
+					return value;
+				}, this);
+				if (this._foreign_id) {
+					result["id"] = result[this._foreign_id];
+					delete result[this._foreign_id];
+				}
+				return result;
+			},
+			
+			_decodeData: function (data) {
+				var result = Objs.map(data, function (value, key) {
+					if (this._types[key] === "id")
+						return value ? value + "" : null;
+					return value;
+				}, this);
+				if (this._foreign_id) {
+					result[this._foreign_id] = result["id"];
+					delete result["id"];
+				}
+				return result;
+			}			
 
 		};
     });
