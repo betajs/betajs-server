@@ -27,7 +27,7 @@ Scoped.define("module:Stores.MongoDatabaseStore", [
 					return value;
 				}, this);
 				if (this._foreign_id) {
-					result["id"] = result[this._foreign_id];
+					result.id = result[this._foreign_id];
 					delete result[this._foreign_id];
 				}
 				return result;
@@ -40,8 +40,8 @@ Scoped.define("module:Stores.MongoDatabaseStore", [
 					return value;
 				}, this);
 				if (this._foreign_id) {
-					result[this._foreign_id] = result["id"];
-					delete result["id"];
+					result[this._foreign_id] = result.id;
+					delete result.id;
 				}
 				return result;
 			}			

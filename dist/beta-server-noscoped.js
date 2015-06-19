@@ -15,7 +15,7 @@ Scoped.binding("data", "global:BetaJS.Data");
 Scoped.define("module:", function () {
 	return {
 		guid: "9955100d-6a88-451f-9a85-004523eb8589",
-		version: '19.1434726526819'
+		version: '20.1434731777433'
 	};
 });
 
@@ -1280,7 +1280,7 @@ Scoped.define("module:Stores.MongoDatabaseStore", [
 					return value;
 				}, this);
 				if (this._foreign_id) {
-					result["id"] = result[this._foreign_id];
+					result.id = result[this._foreign_id];
 					delete result[this._foreign_id];
 				}
 				return result;
@@ -1293,8 +1293,8 @@ Scoped.define("module:Stores.MongoDatabaseStore", [
 					return value;
 				}, this);
 				if (this._foreign_id) {
-					result[this._foreign_id] = result["id"];
-					delete result["id"];
+					result[this._foreign_id] = result.id;
+					delete result.id;
 				}
 				return result;
 			}			
