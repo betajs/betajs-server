@@ -1,10 +1,10 @@
 /*!
-betajs-server - v1.0.0 - 2015-06-19
+betajs-server - v1.0.0 - 2015-07-08
 Copyright (c) Oliver Friedmann
 MIT Software License.
 */
 /*!
-betajs-scoped - v0.0.1 - 2015-03-26
+betajs-scoped - v0.0.2 - 2015-07-08
 Copyright (c) Oliver Friedmann
 MIT Software License.
 */
@@ -118,7 +118,7 @@ var Attach = {
 			var current_version = current.version.split(".");
 			var newer = false;
 			for (var i = 0; i < Math.min(my_version.length, current_version.length); ++i) {
-				newer = my_version[i] > current_version[i];
+				newer = parseInt(my_version[i], 10) > parseInt(current_version[i], 10);
 				if (my_version[i] != current_version[i]) 
 					break;
 			}
@@ -287,6 +287,17 @@ function newNamespace (options) {
 			}
 		}
 	}
+	
+	function nodeUnresolvedWatchers(node, base, result) {
+		node = node || nsRoot;
+		base = base ? base + "." + node.route : node.route;
+		result = result || [];
+		if (!node.ready)
+			result.push(base);
+		for (var k in node.children)
+			result = nodeUnresolvedWatchers(node.children[k], base, result);
+		return result;
+	}
 
 	return {
 		
@@ -319,6 +330,10 @@ function newNamespace (options) {
 		
 		obtain: function (path, callback, context) {
 			nodeAddWatcher(nodeNavigate(path), callback, context);
+		},
+		
+		unresolvedWatchers: function (path) {
+			return nodeUnresolvedWatchers(nodeNavigate(path), path);
 		}
 		
 	};
@@ -511,7 +526,12 @@ function newScope (parent, parentNamespace, rootNamespace, globalNamespace) {
 			var ns = this.resolve(namespaceLocator);
 			ns.namespace.digest(ns.path);
 			return this;
-		}		
+		},
+		
+		unresolved: function (namespaceLocator) {
+			var ns = this.resolve(namespaceLocator);
+			return ns.namespace.unresolvedWatchers(ns.path);
+		}
 		
 	};
 	
@@ -523,7 +543,7 @@ var rootScope = newScope(null, rootNamespace, rootNamespace, globalNamespace);
 var Public = Helper.extend(rootScope, {
 		
 	guid: "4b6878ee-cb6a-46b3-94ac-27d91f58d666",
-	version: '9.1427403679672',
+	version: '9.9436390238591',
 		
 	upgrade: Attach.upgrade,
 	attach: Attach.attach,
@@ -536,8 +556,9 @@ Public = Public.upgrade();
 Public.exports();
 	return Public;
 }).call(this);
+
 /*!
-betajs-server - v1.0.0 - 2015-06-19
+betajs-server - v1.0.0 - 2015-07-08
 Copyright (c) Oliver Friedmann
 MIT Software License.
 */
@@ -553,7 +574,7 @@ Scoped.binding("data", "global:BetaJS.Data");
 Scoped.define("module:", function () {
 	return {
 		guid: "9955100d-6a88-451f-9a85-004523eb8589",
-		version: '20.1434731777433'
+		version: '21.1436390448726'
 	};
 });
 

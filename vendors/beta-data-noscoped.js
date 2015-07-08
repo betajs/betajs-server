@@ -1,5 +1,5 @@
 /*!
-betajs-data - v1.0.0 - 2015-06-17
+betajs-data - v1.0.0 - 2015-07-08
 Copyright (c) Oliver Friedmann
 MIT Software License.
 */
@@ -14,7 +14,7 @@ Scoped.binding("json", "global:JSON");
 Scoped.define("module:", function () {
 	return {
 		guid: "70ed7146-bb6d-4da4-97dc-5a8e2d23a23f",
-		version: '34.1434567668435'
+		version: '39.1436389370226'
 	};
 });
 
@@ -620,8 +620,49 @@ Scoped.define("module:Queries", [
 				}
 			}, this);
 			return result;
-		}
+		},
+		
+		mapKeyValue: function (query, callback, context) {
+			return this.mapKeyValueQuery(query, callback, context);
+		},
+		
+		mapKeyValueQuery: function (query, callback, context) {
+			var result = {};
+			Objs.iter(query, function (value, key) {
+				result = Objs.extend(result, this.mapKeyValuePair(value, key, callback, context));
+			}, this);
+			return result;
+		},
+		
+		mapKeyValueQueries: function (queries, callback, context) {
+			return Objs.map(queries, function (query) {
+				return this.mapKeyValueQuery(query, callback, context);
+			}, this);
+		},
+		
+		mapKeyValuePair: function (value, key, callback, context) {
+			if (key in this.SYNTAX_PAIR_KEYS)
+				return Objs.objectBy(key, this.mapKeyValueQueries(value, callback, context));
+			if (this.is_query_atom(value))
+				return callback.call(context, key, value);
+			var result = {};
+			Objs.iter(value, function (condition_value, condition_key) {
+				result[condition_key] = this.mapKeyValueCondition(condition_value, key, callback, context);
+			}, this);
+			return Obj.objectBy(key, result);
+		},
 
+		mapKeyValueCondition: function (condition_value, key, callback, context) {
+			var is_array = Types.is_array(condition_value);
+			if (!is_array)
+				condition_value = [condition_value];
+			var result = Objs.map(condition_value, function (value) {
+				return Objs.peek(callback.call(context, key, value));
+			}, this);
+			return is_array ? result : result[0];
+		}
+		
+		
 	}; 
 });
 Scoped.define("module:Queries.Engine", [
@@ -1357,7 +1398,7 @@ Scoped.define("module:Stores.PassthroughStore", [
 			},
 
 			_remove: function (id) {
-				return this._preRemove().mapSuccess(function (id) {
+				return this._preRemove(id).mapSuccess(function (id) {
 					return this.__store.remove(id).mapSuccess(function () {
 						return this._postRemove(id);
 					}, this);
@@ -1441,11 +1482,64 @@ Scoped.define("module:Stores.PassthroughStore", [
 });
 
 
+Scoped.define("module:Stores.ReadyStore", [
+                                               "module:Stores.PassthroughStore",
+                                               "base:Promise",
+                                               "base:Objs"
+                                               ], function (PassthroughStore, Promise, Objs, scoped) {
+	return PassthroughStore.extend({scoped: scoped}, function (inherited) {			
+		return {
+			
+			__promises: [],
+			__ready: false,
+			
+			ready: function () {
+				this.__ready = true;
+				Objs.iter(this.__promises, function (rec) {
+					rec.promise.forwardCallback(rec.stalling);
+				});
+				this.__promises = [];
+			},
+			
+			__execute: function (promise) {
+				if (this.__ready)
+					return promise;
+				var stalling = Promise.create();
+				this.__promises.push({
+					stalling: stalling,
+					promise: promise
+				});
+			},
+
+			_preInsert: function () {
+				return this.__execute(inherited._preInsert.apply(this, arguments));
+			},
+			
+			_preRemove: function () {
+				return this.__execute(inherited._preRemove.apply(this, arguments));
+			},
+			
+			_preGet: function () {
+				return this.__execute(inherited._preGet.apply(this, arguments));
+			},
+			
+			_preUpdate: function () {
+				return this.__execute(inherited._preUpdate.apply(this, arguments));
+			},
+			
+			_preQuery: function () {
+				return this.__execute(inherited._preQuery.apply(this, arguments));
+			}
+			
+		};
+	});
+});
+
 Scoped.define("module:Stores.SimulatorStore", [
                                                "module:Stores.PassthroughStore",
                                                "base:Promise"
-                                               ], function (BaseStore, Promise, scoped) {
-	return BaseStore.extend({scoped: scoped}, function (inherited) {			
+                                               ], function (PassthroughStore, Promise, scoped) {
+	return PassthroughStore.extend({scoped: scoped}, function (inherited) {			
 		return {
 			
 			online: true,
@@ -1477,9 +1571,12 @@ Scoped.define("module:Stores.SimulatorStore", [
 
 Scoped.define("module:Stores.TransformationStore", [
                                                  "module:Stores.PassthroughStore",
+                                                 "module:Queries",
                                                  "base:Iterators.MappedIterator",
-                                                 "base:Objs"
-                                                 ], function (PassthroughStore, MappedIterator, Objs, scoped) {
+                                                 "base:Objs",
+                                                 "base:Types",
+                                                 "base:Promise"
+                                                 ], function (PassthroughStore, Queries, MappedIterator, Objs, Types, Promise, scoped) {
 	return PassthroughStore.extend({scoped: scoped}, function (inherited) {			
 		return {
 			
@@ -1500,10 +1597,14 @@ Scoped.define("module:Stores.TransformationStore", [
 			},
 			
 			_encodeQuery: function (query, options) {
-				// Usually needs better encoding
+				var opts = Objs.clone(options);
+				if (opts.sort)
+					opts.sort = Types.is_object(opts.sort) ? this._encodeData(opts.sort) : {};
 				return {
-					query: query,
-					options: options
+					query: Queries.mapKeyValue(query, function (key, value) {
+						return this._encodeData(Objs.objectBy(key, value)); 
+					}, this),
+					options: opts
 				};
 			},
 
@@ -2295,6 +2396,7 @@ Scoped.define("module:Stores.PartialStore", [
 				this.cachedStore.on("update", function (row, data) {
 					this._updated(this.cachedStore.id_of(row), data);
 				}, this);
+				this.writeStrategy.init(this);
 			},
 			
 			destroy: function () {
@@ -2305,15 +2407,15 @@ Scoped.define("module:Stores.PartialStore", [
 			},
 
 			_insert: function (data) {
-				return this.writeStrategy.insert(this, data);
+				return this.writeStrategy.insert(data);
 			},
 			
 			_remove: function (id) {
-				return this.writeStrategy.remove(this, id);
+				return this.writeStrategy.remove(id);
 			},
 			
 			_update: function (id, data) {
-				return this.writeStrategy.update(this, id, data);
+				return this.writeStrategy.update(id, data);
 			},
 
 			_get: function (id) {
@@ -2350,7 +2452,7 @@ Scoped.define("module:Stores.PartialStore", [
 			
 			_remoteRemove: function (id) {
 				this.cachedStore.cacheRemove(id, {
-					ignoreLock: true,
+					ignoreLock: false,
 					silent: false
 				});
 			}
@@ -2363,12 +2465,16 @@ Scoped.define("module:Stores.PartialStoreWriteStrategies.WriteStrategy", [
                                                                           ], function (Class, scoped) {
 	return Class.extend({scoped: scoped}, function (inherited) {
 		return {
+			
+			init: function (partialStore) {
+				this.partialStore = partialStore;
+			},
 
-			insert: function (partialStore, data) {},
+			insert: function (data) {},
 
-			remove: function (partialStore, id) {},
+			remove: function (id) {},
 
-			update: function (partialStore, data) {}
+			update: function (data) {}
 
 		};
 	});
@@ -2380,36 +2486,36 @@ Scoped.define("module:Stores.PartialStoreWriteStrategies.PostWriteStrategy", [
 	return Class.extend({scoped: scoped}, function (inherited) {
 		return {
 
-			insert: function (partialStore, data) {
-				return partialStore.remoteStore.insert(data).mapSuccess(function (data) {
-					return partialStore.cachedStore.cacheInsert(data, {
+			insert: function (data) {
+				return this.partialStore.remoteStore.insert(data).mapSuccess(function (data) {
+					return this.partialStore.cachedStore.cacheInsert(data, {
 						lockItem: false,
 						silent: true,
 						refreshMeta: true,
 						accessMeta: true
-					});
-				});
+					}, this);
+				}, this);
 			},
 
-			remove: function (partialStore, id) {
-				return partialStore.remoteStore.remove(id).mapSuccess(function () {
-					return partialStore.cachedStore.cacheRemove(id, {
+			remove: function (id) {
+				return this.partialStore.remoteStore.remove(id).mapSuccess(function () {
+					return this.partialStore.cachedStore.cacheRemove(id, {
 						ignoreLock: true,
 						silent: true
-					});
-				});
+					}, this);
+				}, this);
 			},
 
-			update: function (partialStore, id, data) {
-				return partialStore.remoteStore.update(id, data).mapSuccess(function () {
-					return partialStore.cachedStore.cacheUpdate(id, data, {
+			update: function (id, data) {
+				return this.partialStore.remoteStore.update(id, data).mapSuccess(function () {
+					return this.partialStore.cachedStore.cacheUpdate(id, data, {
 						ignoreLock: false,
 						lockAttrs: false,
 						silent: true,
 						refreshMeta: true,
 						accessMeta: true
-					});
-				});
+					}, this);
+				}, this);
 			}
 
 		};
@@ -2423,45 +2529,45 @@ Scoped.define("module:Stores.PartialStoreWriteStrategies.PreWriteStrategy", [
 	return Class.extend({scoped: scoped}, function (inherited) {
 		return {
 
-			insert: function (partialStore, data) {
-				return partialStore.cachedStore.cacheInsert(data, {
+			insert: function (data) {
+				return this.partialStore.cachedStore.cacheInsert(data, {
 					lockItem: true,
 					silent: true,
 					refreshMeta: true,
 					accessMeta: true
 				}).success(function (data) {
-					partialStore.remoteStore.insert(data).success(function () {
-						partialStore.cachedStore.unlockItem(partialStore.cachedStore.id_of(data));
-					}).error(function () {
-						partialStore.cachedStore.cacheRemove(partialStore.cachedStore.id_of(data), {
+					this.partialStore.remoteStore.insert(data).success(function () {
+						this.partialStore.cachedStore.unlockItem(this.partialStore.cachedStore.id_of(data));
+					}, this).error(function () {
+						this.partialStore.cachedStore.cacheRemove(this.partialStore.cachedStore.id_of(data), {
 							ignoreLock: true,
 							silent: false
 						});
-					});
-				});
+					}, this);
+				}, this);
 			},
 
-			remove: function (partialStore, id) {
-				return partialStore.cachedStore.cacheRemove(id, {
+			remove: function (id) {
+				return this.partialStore.cachedStore.cacheRemove(id, {
 					ignoreLock: true,
 					silent: true
 				}).success(function () {
-					partialStore.remoteStore.remove(id);
-				});
+					this.partialStore.remoteStore.remove(id);
+				}, this);
 			},
 
-			update: function (partialStore, id, data) {
-				return partialStore.cachedStore.cacheUpdate(id, data, {
+			update: function (id, data) {
+				return this.partialStore.cachedStore.cacheUpdate(id, data, {
 					lockAttrs: true,
 					ignoreLock: false,
 					silent: true,
 					refreshMeta: false,
 					accessMeta: true
 				}).success(function (data) {
-					partialStore.remoteStore.update(id, data).success(function () {
-						partialStore.cachedStore.unlockItem(partialStore.cachedStore.id_of(data));
-					});
-				});
+					this.partialStore.remoteStore.update(id, data).success(function () {
+						this.partialStore.cachedStore.unlockItem(this.partialStore.cachedStore.id_of(data));
+					}, this);
+				}, this);
 			}
 	
 		};
@@ -2473,17 +2579,18 @@ Scoped.define("module:Stores.PartialStoreWriteStrategies.CommitStrategy", [
                                                                            "module:Stores.PartialStoreWriteStrategies.WriteStrategy",
                                                                            "module:Stores.StoreHistory",
                                                                            "module:Stores.MemoryStore",
-                                                                           "base:Objs"
-                                                                           ], function (Class, StoreHistory, MemoryStore, Objs, scoped) {
+                                                                           "base:Objs",
+                                                                           "base:Timers.Timer"
+                                                                           ], function (Class, StoreHistory, MemoryStore, Objs, Timer, scoped) {
 	return Class.extend({scoped: scoped}, function (inherited) {
 		return {
 
 			constructor: function (historyStore, options) {
 				inherited.constructor.call(this);
-				options = options || {};
-				this.historyStore = options.historyStore || this.auto_destroy(new MemoryStore());
+				this._options = options || {};
+				this.historyStore = this._options.historyStore || this.auto_destroy(new MemoryStore());
 				this.storeHistory = this.auto_destroy(new StoreHistory(null, this.historyStore, {
-					source_id_key: options.source_id_key || "id",
+					source_id_key: this._options.source_id_key || "id",
 					row_data: {
 						pushed: false,
 						success: false
@@ -2493,9 +2600,23 @@ Scoped.define("module:Stores.PartialStoreWriteStrategies.CommitStrategy", [
 					}
 				}));
 			},
+			
+			init: function (partialStore) {
+				inherited.init.call(this, partialStore);
+				if (this._options.auto_push) {
+					this.auto_destroy(new Timer({
+						fire: function () {
+							this.push(this.partialStore);
+						},
+						context: this,
+						start: true,
+						delay: this._options.auto_push
+					}));
+				}
+			},
 
-			insert: function (partialStore, data) {
-				return partialStore.cachedStore.cacheInsert(data, {
+			insert: function (data) {
+				return this.partialStore.cachedStore.cacheInsert(data, {
 					lockItem: true,
 					silent: true,
 					refreshMeta: true,
@@ -2505,8 +2626,8 @@ Scoped.define("module:Stores.PartialStoreWriteStrategies.CommitStrategy", [
 				}, this);
 			},
 
-			remove: function (partialStore, id) {
-				return partialStore.cachedStore.cacheRemove(id, {
+			remove: function (id) {
+				return this.partialStore.cachedStore.cacheRemove(id, {
 					ignoreLock: true,
 					silent: true
 				}).success(function () {
@@ -2514,8 +2635,8 @@ Scoped.define("module:Stores.PartialStoreWriteStrategies.CommitStrategy", [
 				}, this);
 			},
 
-			update: function (partialStore, id, data) {
-				return partialStore.cachedStore.cacheUpdate(id, data, {
+			update: function (id, data) {
+				return this.partialStore.cachedStore.cacheUpdate(id, data, {
 					lockAttrs: true,
 					ignoreLock: false,
 					silent: true,
@@ -2525,8 +2646,8 @@ Scoped.define("module:Stores.PartialStoreWriteStrategies.CommitStrategy", [
 					this.storeHistory.sourceUpdate(id, data);
 				}, this);
 			},
-
-			push: function (partialStore) {
+			
+			push: function () {
 				if (this.pushing)
 					return;
 				var failedIds = {};
@@ -2538,7 +2659,7 @@ Scoped.define("module:Stores.PartialStoreWriteStrategies.CommitStrategy", [
 						this.pushing = false;
 						Objs.iter(unlockIds, function (value, id) {
 							if (value) 
-								partialStore.cachedStore.unlockItem(id);
+								this.partialStore.cachedStore.unlockItem(id);
 						}, this);
 						return;
 					}
@@ -2553,11 +2674,11 @@ Scoped.define("module:Stores.PartialStoreWriteStrategies.CommitStrategy", [
 					} else {
 						var promise = null;
 						if (commit.type === "insert")
-							promise = partialStore.remoteStore.insert(commit.row);
+							promise = this.partialStore.remoteStore.insert(commit.row);
 						else if (commit.type === "update")
-							promise = partialStore.remoteStore.update(commit.row_id, commit.row);
+							promise = this.partialStore.remoteStore.update(commit.row_id, commit.row);
 						else if (commit.type === "remove")
-							promise = partialStore.remoteStore.remove(commit.row_id);
+							promise = this.partialStore.remoteStore.remove(commit.row_id);
 						promise.success(function () {
 							hs.update(commit_id, {
 								pushed: true,
@@ -3087,8 +3208,9 @@ Scoped.define("module:Stores.Watchers.LocalWatcher", [
 Scoped.define("module:Stores.Watchers.PollWatcher", [
                                                      "module:Stores.Watchers.StoreWatcher",
                                                      "base:Comparators",
-                                                     "base:Objs"
-                                                     ], function(StoreWatcher, Comparators, Objs, scoped) {
+                                                     "base:Objs",
+                                                     "base:Timers.Timer"
+                                                     ], function(StoreWatcher, Comparators, Objs, Timer, scoped) {
 	return StoreWatcher.extend({scoped: scoped}, function (inherited) {
 		return {
 
@@ -3100,8 +3222,17 @@ Scoped.define("module:Stores.Watchers.PollWatcher", [
 				options = options || {};
 				this.__itemCache = {};
 				this.__lastKey = null;
+				this.__lastKeyIds = {};
 				this.__insertsCount = 0;
 				this.__increasingKey = options.increasing_key || this.id_key;
+				if (options.auto_poll) {
+					this.auto_destroy(new Timer({
+						fire: this.poll,
+						context: this,
+						start: true,
+						delay: options.auto_poll
+					}));
+				}
 			},
 
 			_watchItem : function(id) {
@@ -3128,6 +3259,7 @@ Scoped.define("module:Stores.Watchers.PollWatcher", [
 				if (this.__insertsCount === 0) {
 					this._queryLastKey().success(function (value) {
 						this.__lastKey = value;
+						this.__lastKeyIds = {};
 					}, this);
 				}
 				this.__insertsCount++;
@@ -3142,29 +3274,38 @@ Scoped.define("module:Stores.Watchers.PollWatcher", [
 			poll: function () {
 				Objs.iter(this.__itemCache, function (value, id) {
 					this._store.get(id).success(function (data) {
-						if (!data)
+						if (!data) 
 							this._removedItem(id);
 						else {
 							this.__itemCache[id] = Objs.clone(data, 1);
 							if (value && !Comparators.deepEqual(value, data, -1))
 								this._updatedItem(data, data);
 						}
-					}, this).error(function () {
-						this._removedItem(id);
 					}, this);
 				}, this);
 				if (this.__lastKey) {
 					this.insertsIterator().iterate(function (query) {
 						var keyQuery = Objs.objectBy(this.__increasingKey, {"$gte": this.__lastKey});
 						this._store.query({"$and": [keyQuery, query]}).success(function (result) {
-							while (result.hasNext())
-								this._insertedInsert(result.next());
+							while (result.hasNext()) {
+								var item = result.next();
+								var id = this._store.id_of(item);
+								if (!this.__lastKeyIds[id])
+									this._insertedInsert(item);
+								this.__lastKeyIds[id] = true;
+								if (id > this.__lastKey)
+									this.__lastKey = id; 
+							}
 						}, this);
 					}, this);
+				} else {
+					this._queryLastKey().success(function (value) {
+						if (value !== this.__lastKey) {
+							this.__lastKey = value;
+							this.__lastKeyIds = {};
+						}
+					}, this);
 				}
-				this._queryLastKey().success(function (value) {
-					this.__lastKey = value;
-				}, this);
 			}
 
 		};
@@ -3268,7 +3409,7 @@ Scoped.define("module:Stores.Watchers.StoreWatcher", [
 			_removedItem : function(id) {
 				if (!this.__items.get(id))
 					return;
-				this.unwatchItem(id, null);
+				//this.unwatchItem(id, null);
 				this._removedWatchedItem(id);
 			},
 
@@ -4654,7 +4795,7 @@ Scoped.define("module:Modelling.Associations.BelongsToAssociation", [
     });
 });
 Scoped.define("module:Modelling.Associations.ConditionalAssociation", [
-                                                                       "module:Modelling.Associations.Associations",
+                                                                       "module:Modelling.Associations.Association",
                                                                        "base:Objs"
                                                                        ], function (Associations, Objs, scoped) {
 	return Associations.extend({scoped: scoped}, function (inherited) {
