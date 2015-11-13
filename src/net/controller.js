@@ -36,10 +36,14 @@ Scoped.define("module:Net.Controller", [
 		_beforeDispatch : function(method, request, response) {
 			return Promise.create(true);
 		},
+		
+		_dispatch: function (method, request, response) {
+			return this[method](request, response);
+		},
 	
 		dispatch : function(method, request, response, next) {
 			this._beforeDispatch(method, request, response).success(function () {
-				var result = this[method](request, response);
+				var result = this._dispatch(method, request, response);
 				result = Promise.is(result) ? result : Promise.create(true);
 				result.success(function () {
 					if (Types.is_defined(next))

@@ -1,5 +1,5 @@
 /*!
-betajs-server - v1.0.0 - 2015-07-08
+betajs-server - v1.0.1 - 2015-11-12
 Copyright (c) Oliver Friedmann
 MIT Software License.
 */
@@ -15,7 +15,7 @@ Scoped.binding("data", "global:BetaJS.Data");
 Scoped.define("module:", function () {
 	return {
 		guid: "9955100d-6a88-451f-9a85-004523eb8589",
-		version: '21.1436390448726'
+		version: '22.1447385897709'
 	};
 });
 
@@ -125,10 +125,14 @@ Scoped.define("module:Net.Controller", [
 		_beforeDispatch : function(method, request, response) {
 			return Promise.create(true);
 		},
+		
+		_dispatch: function (method, request, response) {
+			return this[method](request, response);
+		},
 	
 		dispatch : function(method, request, response, next) {
 			this._beforeDispatch(method, request, response).success(function () {
-				var result = this[method](request, response);
+				var result = this._dispatch(method, request, response);
 				result = Promise.is(result) ? result : Promise.create(true);
 				result.success(function () {
 					if (Types.is_defined(next))
