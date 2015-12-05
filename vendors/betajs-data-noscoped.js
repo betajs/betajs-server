@@ -1,5 +1,5 @@
 /*!
-betajs-data - v1.0.0 - 2015-07-08
+betajs-data - v1.0.7 - 2015-12-05
 Copyright (c) Oliver Friedmann
 MIT Software License.
 */
@@ -14,7 +14,7 @@ Scoped.binding("json", "global:JSON");
 Scoped.define("module:", function () {
 	return {
 		guid: "70ed7146-bb6d-4da4-97dc-5a8e2d23a23f",
-		version: '39.1436389370226'
+		version: '53.1449325779182'
 	};
 });
 
@@ -1007,8 +1007,9 @@ Scoped.define("module:Stores.AssocStore", [
 
 Scoped.define("module:Stores.MemoryStore", [
                                             "module:Stores.AssocStore",
-                                            "base:Iterators.ObjectValuesIterator"
-                                            ], function (AssocStore, ObjectValuesIterator, scoped) {
+                                            "base:Iterators.ObjectValuesIterator",
+                                            "base:Objs"
+                                            ], function (AssocStore, ObjectValuesIterator, Objs, scoped) {
 	return AssocStore.extend({scoped: scoped}, function (inherited) {			
 		return {
 
@@ -1031,6 +1032,10 @@ Scoped.define("module:Stores.MemoryStore", [
 
 			_iterate: function () {
 				return new ObjectValuesIterator(this.__data);
+			},
+			
+			_count: function (query) {
+				return query ? inherited._count.call(this, query) : Objs.count(this.__data);
 			}
 
 		};
@@ -1060,12 +1065,12 @@ Scoped.define("module:Stores.BaseStore", [
 				return this._ensure_index(key);
 			},
 
-			clear: function () {
-				return this.query().mapSuccess(function (iter) {
+			clear: function (ctx) {
+				return this.query(null, null, ctx).mapSuccess(function (iter) {
 					var promise = Promise.and();
 					while (iter.hasNext()) {
 						var obj = iter.next();
-						promise = promise.and(this.remove(obj[this._id_key]));
+						promise = promise.and(this.remove(obj[this._id_key], ctx));
 					}
 					return promise;
 				}, this);
@@ -1087,30 +1092,41 @@ Scoped.define("module:Stores.ReadStoreMixin", [
 			options = options || {};
 			this.indices = {};
 			this._watcher = options.watcher || null;
+			this._capabilities = options.capabilities || {};
 		},
 		
 		watcher: function () {
 			return this._watcher;
 		},
 
-		_get: function (id) {
+		_get: function (id, ctx) {
 			return Promise.create(null, new StoreException("unsupported: get"));
 		},
 
 		_query_capabilities: function () {
-			return {};
+			return this._capabilities;
 		},
 
-		_query: function (query, options) {
+		_query: function (query, options, ctx) {
 			return Promise.create(null, new StoreException("unsupported: query"));
 		},
 
-		get: function (id) {
-			return this._get(id);
+		get: function (id, ctx) {
+			return this._get(id, ctx);
+		},
+		
+		count: function (query, ctx) {
+			return this._count(query, ctx);
+		},
+		
+		_count: function (query, ctx) {
+			return this.query(query, {}, ctx).mapSuccess(function (iter) {
+				return iter.asArray().length;
+			});
 		},
 
-		query: function (query, options) {
-			query = Objs.clone(query, -1);
+		query: function (query, options, ctx) {
+			query = Objs.clone(query || {}, -1);
 			options = Objs.clone(options, -1);
 			if (options) {
 				if (options.limit)
@@ -1122,7 +1138,7 @@ Scoped.define("module:Stores.ReadStoreMixin", [
 					{query: query, options: options || {}},
 					this._query_capabilities(),
 					function (constrainedQuery) {
-						return this._query(constrainedQuery.query, constrainedQuery.options);
+						return this._query(constrainedQuery.query, constrainedQuery.options, ctx);
 					},
 					this,
 					this.indices);
@@ -1283,60 +1299,66 @@ Scoped.define("module:Stores.WriteStoreMixin", [
 		id_of: function (row) {
 			return row[this.id_key()];
 		},
-
-		_inserted: function (row) {
-			this.trigger("insert", row);		
-			this.trigger("write", "insert", row);
+		
+		id_row: function (id) {
+			var result = {};
+			result[this._id_key] = id;
+			return result;
 		},
 
-		_removed: function (id) {
-			this.trigger("remove", id);
-			this.trigger("write", "remove", id);
+		_inserted: function (row, ctx) {
+			this.trigger("insert", row, ctx);		
+			this.trigger("write", "insert", row, ctx);
 		},
 
-		_updated: function (row, data) {
-			this.trigger("update", row, data);	
-			this.trigger("write", "update", row, data);
+		_removed: function (id, ctx) {
+			this.trigger("remove", id, ctx);
+			this.trigger("write", "remove", id, ctx);
+		},
+
+		_updated: function (row, data, ctx) {
+			this.trigger("update", row, data, ctx);	
+			this.trigger("write", "update", row, data, ctx);
 		}, 
 
-		insert_all: function (data, query) {
+		insert_all: function (data, ctx) {
 			var promise = Promise.and();
 			for (var i = 0; i < data.length; ++i)
-				promise = promise.and(this.insert(data[i]));
+				promise = promise.and(this.insert(data[i], ctx));
 			return promise.end();
 		},
 
-		_insert: function (data) {
+		_insert: function (data, ctx) {
 			return Promise.create(null, new StoreException("unsupported: insert"));
 		},
 
-		_remove: function (id) {
+		_remove: function (id, ctx) {
 			return Promise.create(null, new StoreException("unsupported: remove"));
 		},
 
-		_update: function (id, data) {
+		_update: function (id, data, ctx) {
 			return Promise.create(null, new StoreException("unsupported: update"));
 		},
 
-		insert: function (data) {
+		insert: function (data, ctx) {
 			if (!data)
 				return Promise.create(null, new StoreException("empty insert"));
 			if (this._create_ids && !(this._id_key in data && data[this._id_key]))
 				data[this._id_key] = this._id_generator.generate();
-			return this._insert(data).success(function (row) {
-				this._inserted(row);
+			return this._insert(data, ctx).success(function (row) {
+				this._inserted(row, ctx);
 			}, this);
 		},
 
-		remove: function (id) {
-			return this._remove(id).success(function () {
-				this._removed(id);
+		remove: function (id, ctx) {
+			return this._remove(id, ctx).success(function () {
+				this._removed(id, ctx);
 			}, this);
 		},
 
-		update: function (id, data) {
-			return this._update(id, data).success(function (row) {
-				this._updated(row, data);
+		update: function (id, data, ctx) {
+			return this._update(id, data, ctx).success(function (row) {
+				this._updated(row, data, ctx);
 			}, this);
 		}
 
@@ -1366,6 +1388,257 @@ Scoped.define("module:Stores.WriteStore", [
 
 		};
 	}]);
+});
+
+Scoped.define("module:Stores.ContextualizedStore", [
+                                                 "module:Stores.BaseStore",
+                                                 "base:Iterators.MappedIterator",
+                                                 "base:Promise"
+                                                 ], function (BaseStore, MappedIterator, Promise, scoped) {
+	return BaseStore.extend({scoped: scoped}, function (inherited) {			
+		return {
+
+			constructor: function (store, options) {
+				this.__store = store;
+				options = options || {};
+				options.id_key = store.id_key();
+				this.__context = options.context || this;
+				this.__decode = options.decode;
+				this.__encode = options.encode;
+				inherited.constructor.call(this, options);
+				if (options.destroy_store)
+					this._auto_destroy(store);
+			},
+			
+			_decode: function (data) {
+				return this.__decode.call(this.__context, data);
+			},
+			
+			_encode: function (data, ctx) {
+				return this.__encode.call(this.__context, data, ctx);
+			},
+			
+			_decodeId: function (id) {
+				var result = this._decode(this.id_row(id));
+				return {
+					id: this.id_of(result.data),
+					ctx: result.ctx
+				};
+			},
+
+			_query_capabilities: function () {
+				return this.__store._query_capabilities();
+			},
+
+			_insert: function (data) {
+				var decoded = this._decode(data);
+				return this.__store.insert(decoded.data, decoded.ctx).mapSuccess(function (data) {
+					return this._encode(data, decoded.ctx);
+				}, this);
+			},
+
+			_remove: function (id) {
+				var decoded = this._decodeId(id);
+				return this.__store.remove(decoded.id, decoded.ctx).mapSuccess(function () {
+					return id;
+				}, this);
+			},
+
+			_get: function (id) {
+				var decoded = this._decodeId(id);
+				return this.__store.get(decoded.id, decoded.ctx).mapSuccess(function (data) {
+					return this._encode(data, decoded.ctx);
+				}, this);
+			},
+
+			_update: function (id, data) {
+				var decoded = this._decodeId(id);
+				this.__store.update(decoded.id, data, decoded.ctx).mapSuccess(function (row) {
+					return row;
+				}, this);
+			},
+
+			_query: function (query, options) {
+				var decoded = this._decode(query);
+				return this.__store.query(decoded.data, options, decoded.ctx).mapSuccess(function (results) {
+					return new MappedIterator(results, function (row) {
+						return this._encode(row, decoded.ctx);
+					}, this);
+				}, this);
+			},
+
+			_ensure_index: function (key) {
+				return this.__store.ensure_index(key);
+			},
+
+			_store: function () {
+				return this.__store;
+			}
+
+		};
+	});
+});
+
+
+
+Scoped.define("module:Stores.DecontextualizedSelectStore", [
+	"module:Stores.BaseStore",
+	"base:Iterators.MappedIterator",
+	"base:Promise"
+], function (BaseStore, MappedIterator, Promise, scoped) {
+   	return BaseStore.extend({scoped: scoped}, function (inherited) {			
+   		return {
+
+   			constructor: function (store, options) {
+   				this.__store = store;
+   				options = options || {};
+   				options.id_key = store.id_key();
+   				inherited.constructor.call(this, options);
+   				if (options.destroy_store)
+   					this._auto_destroy(store);
+   			},
+   			
+   			_decode: function (data, ctx) {
+   				data = Objs.clone(data, 1);
+   				Objs.iter(ctx, function (value, key) {
+   					delete data[key];
+   				});
+   				return data;
+   			},
+   			
+   			_encode: function (data, ctx) {
+   				return Objs.extend(Objs.clone(data, 1), ctx);
+   			},
+   			
+   			_query_capabilities: function () {
+   				return this.__store._query_capabilities();
+   			},
+
+   			_insert: function (data, ctx) {
+   				return this.__store.insert(this._encode(data, ctx)).mapSuccess(function (data) {
+   					return this._decode(data, ctx);
+   				}, this);
+   			},
+
+   			_query: function (query, options, ctx) {
+   				return this.__store.query(this._encode(query, ctx), options).mapSuccess(function (results) {
+   					return new MappedIterator(results, function (row) {
+   						return this._decode(row, ctx);
+   					}, this);
+   				}, this);
+   			},
+
+   			_ensure_index: function (key) {
+   				return this.__store.ensure_index(key);
+   			},
+
+   			_store: function () {
+   				return this.__store;
+   			},
+
+   			_get: function (id, ctx) {
+   				return this.query(this.id_row(id), {limit: 1}, ctx).mapSuccess(function (rows) {
+   					if (!rows.hasNext())
+   						return null;
+   					return this._decode(rows.next(), ctx);
+   				}, this);
+   			},
+
+   			_remove: function (id, ctx) {
+   				return this.query(this.id_row(id), {limit: 1}, ctx).mapSuccess(function (rows) {
+   					if (!rows.hasNext())
+   						return null;
+   					return this.__store.remove(this.__store.id_of(this._decode(rows.next(), ctx)));
+   				}, this);
+   			},
+
+   			_update: function (id, data, ctx) {
+   				return this.query(this.id_row(id), {limit: 1}, ctx).mapSuccess(function (rows) {
+   					if (!rows.hasNext())
+   						return null;
+   					return this.__store.update(this.__store.id_of(this._decode(rows.next(), ctx)), data);
+   				}, this);
+   			}
+
+   		};
+   	});
+});
+
+Scoped.define("module:Stores.MultiplexerStore", [
+                                                 "module:Stores.BaseStore",
+                                                 "module:Queries.Constrained",
+                                                 "base:Promise"
+                                                 ], function (BaseStore, Constrained, Promise, scoped) {
+	return BaseStore.extend({scoped: scoped}, function (inherited) {			
+		return {
+
+			constructor: function (options) {
+				inherited.constructor.call(this, options);
+				this.__context = options.context || this;
+				this.__acquireStore = options.acquireStore;
+				this.__releaseStore = options.releaseStore;
+				this.__mapContext = options.mapContext;
+			},
+			
+			_acquireStore: function (ctx) {
+				return Promise.value(this.__acquireStore ? this.__acquireStore.call(this.__context, ctx) : ctx);
+			},
+			
+			_releaseStore: function (ctx, store) {
+				if (this.__releaseStore)
+					this.__releaseStore.call(this.__context, ctx, store);
+			},
+			
+			_mapContext: function (ctx) {
+				return this.__mapContext ? this.__mapContext.call(this.__context, ctx) : null;
+			},
+
+			_query_capabilities: function () {
+				return Constrained.fullConstrainedQueryCapabilities();
+			},
+
+			_insert: function (data, ctx) {
+				return this._acquireStore(ctx).mapSuccess(function (store) {
+					return store.insert(data, this._mapContext(ctx)).callback(function () {
+						this._releaseStore(ctx, store);
+					}, this);
+				}, this);
+			},
+			
+			_remove: function (id, ctx) {
+				return this._acquireStore(ctx).mapSuccess(function (store) {
+					return store.remove(id, this._mapContext(ctx)).callback(function () {
+						this._releaseStore(ctx, store);
+					}, this);
+				}, this);
+			},
+
+			_update: function (id, data, ctx) {
+				return this._acquireStore(ctx).mapSuccess(function (store) {
+					return store.update(id, data, this._mapContext(ctx)).callback(function () {
+						this._releaseStore(ctx, store);
+					}, this);
+				}, this);
+			},
+
+			_get: function (id, ctx) {
+				return this._acquireStore(ctx).mapSuccess(function (store) {
+					return store.get(id, this._mapContext(ctx)).callback(function () {
+						this._releaseStore(ctx, store);
+					}, this);
+				}, this);
+			},
+			
+			_query: function (query, options, ctx) {
+				return this._acquireStore(ctx).mapSuccess(function (store) {
+					return store.query(query, options, this._mapContext(ctx)).callback(function () {
+						this._releaseStore(ctx, store);
+					}, this);
+				}, this);
+			}
+
+		};
+	});
 });
 
 
@@ -1535,6 +1808,61 @@ Scoped.define("module:Stores.ReadyStore", [
 	});
 });
 
+
+Scoped.define("module:Stores.ResilientStore", [
+                                                 "module:Stores.BaseStore",
+                                                 "base:Promise"
+                                                 ], function (BaseStore, Promise, scoped) {
+	return BaseStore.extend({scoped: scoped}, function (inherited) {			
+		return {
+
+			constructor: function (store, options) {
+				this.__store = store;
+				options = options || {};
+				options.id_key = store.id_key();
+				inherited.constructor.call(this, options);
+				this._resilience = options.resilience || 10;
+				if (options.destroy_store)
+					this._auto_destroy(store);
+			},
+
+			_query_capabilities: function () {
+				return this.__store._query_capabilities();
+			},
+
+			_insert: function () {
+				return Promise.resilientCall(this._store.insert, this._store, this._resilience, arguments);
+			},
+
+			_remove: function () {
+				return Promise.resilientCall(this._store.remove, this._store, this._resilience, arguments);
+			},
+
+			_get: function () {
+				return Promise.resilientCall(this._store.get, this._store, this._resilience, arguments);
+			},
+
+			_update: function (id, data) {
+				return Promise.resilientCall(this._store.update, this._store, this._resilience, arguments);
+			},
+
+			_query: function (query, options) {
+				return Promise.resilientCall(this._store.update, this._store, this._resilience, arguments);
+			},
+
+			_ensure_index: function (key) {
+				return this.__store.ensure_index(key);
+			},
+
+			_store: function () {
+				return this.__store;
+			}
+
+		};
+	});
+});
+
+
 Scoped.define("module:Stores.SimulatorStore", [
                                                "module:Stores.PassthroughStore",
                                                "base:Promise"
@@ -1567,6 +1895,75 @@ Scoped.define("module:Stores.SimulatorStore", [
 		};
 	});
 });
+
+
+Scoped.define("module:Stores.TableStore", [
+    "module:Stores.BaseStore",
+    "base:Iterators.MappedIterator",
+    "module:Queries.Constrained"
+], function (BaseStore, MappedIterator, Constrained, scoped) {
+	return BaseStore.extend({scoped: scoped}, function (inherited) {			
+		return {
+
+			constructor: function (table, options) {
+				this.__table = table;
+				options = options || {};
+				options.id_key = table.primary_key();
+				inherited.constructor.call(this, options);
+				this.__options = {
+					insertTags: options.insertTags || [],
+					readTags: options.readTags || [],
+					updateTags: options.updateTags || []
+				};
+			},
+
+			_query_capabilities: function () {
+				return Constrained.fullConstrainedQueryCapabilities();
+			},
+
+			_insert: function (data, ctx) {
+				var model = this.__table.newModel({}, null, ctx);
+				model.setAllByTags(data, this.__options.insertTags);
+				return model.save().mapSuccess(function () {
+					return model.asRecord(this.__options.readTags);
+				}, this);
+			},
+
+			_remove: function (id, ctx) {
+				return this.__table.findById(id, ctx).mapSuccess(function (model) {
+					return model ? model.remove() : model;
+				}, this);
+			},
+
+			_get: function (id, ctx) {
+				return this.__table.findById(id, ctx).mapSuccess(function (model) {
+					return model ? model.asRecord(this.__options.readTags) : model;
+				}, this);
+			},
+
+			_update: function (id, data, ctx) {
+				return this.__table.findById(id, ctx).mapSuccess(function (model) {
+					if (!model)
+						return model;
+					model.setByTags(data, this.__options.updateTags);
+					return model.save().mapSuccess(function () {
+						return model.asRecord(this.__options.readTags);
+					}, this);
+				}, this);
+			},
+
+			_query: function (query, options, ctx) {
+				return this.__table.query(query, options, ctx).mapSuccess(function (models) {
+					return new MappedIterator(models, function (model) {
+						return model.asRecord(this.__options.readTags);
+					}, this);
+				}, this);
+			}
+
+		};
+	});
+});
+
 
 
 Scoped.define("module:Stores.TransformationStore", [
@@ -1897,6 +2294,365 @@ Scoped.define("module:Stores.LocalStore", [
 	});
 });
 
+Scoped.define("module:Stores.Invokers.RestInvokeeAjaxInvoker", [
+    "base:Class",
+    "base:Net.Uri",
+    "base:Net.HttpHeader",
+    "module:Stores.Invokers.RestInvokee"
+], function (Class, Uri, HttpHeader, Invokee, scoped) {
+	return Class.extend({scoped: scoped}, [Invokee, function (inherited) {
+		return {
+			
+			constructor: function (ajax) {
+				inherited.constructor.call(this);
+				this.__ajax = ajax;
+			},
+			
+			restInvoke: function (method, uri, post, get) {
+				return this.__ajax.asyncCall({
+					method: method,
+					data: post,
+					uri: Uri.appendUriParams(uri, get)
+				}).mapError(function (error) {
+					return {
+						error: error.status_code(),
+						data: error.data(),
+						invalid: error.status_code() === HttpHeader.HTTP_STATUS_PRECONDITION_FAILED
+					};
+				}, this);
+			}			
+			
+		};
+	}]);
+});
+Scoped.define("module:Stores.Invokers.StoreInvokee", [], function () {
+	return {
+		storeInvoke: function (member, data, context) {}
+	};
+});
+
+
+Scoped.define("module:Stores.Invokers.RestInvokee", [], function () {
+	return {
+		restInvoke: function (method, uri, post, get, ctx) {}
+	};
+});
+
+
+Scoped.define("module:Stores.Invokers.RouteredRestInvokee", [], function () {
+	return {
+		routeredRestInvoke: function (member, uriData, post, get, ctx) {}
+	};
+});
+
+
+
+Scoped.define("module:Stores.Invokers.InvokerStore", ["module:Stores.BaseStore"], function (BaseStore, scoped) {
+	return BaseStore.extend({scoped: scoped}, function (inherited) {			
+		return {
+			
+			constructor: function (storeInvokee, options) {
+				inherited.constructor.call(this, options);
+				this.__storeInvokee = storeInvokee;
+			},
+			
+			__invoke: function (member, data, context) {
+				return this.__storeInvokee.storeInvoke(member, data, context);
+			},
+
+			_insert: function (data, ctx) {
+				return this.__invoke("insert", data, ctx);
+			},
+
+			_remove: function (id, ctx) {
+				return this.__invoke("remove", id, ctx);
+			},
+
+			_get: function (id, ctx) {
+				return this.__invoke("get", id, ctx);
+			},
+
+			_update: function (id, data, ctx) {
+				return this.__invoke("update", {
+					id: id,
+					data: data
+				}, ctx);
+			},
+
+			_query: function (query, options, ctx) {
+				return this.__invoke("query", {
+					query: query,
+					options: options
+				}, ctx);
+			}
+
+		};
+	});
+});
+
+
+
+
+Scoped.define("module:Stores.Invokers.StoreInvokeeInvoker", ["base:Class", "module:Stores.Invokers.StoreInvokee"], function (Class, Invokee, scoped) {
+	return Class.extend({scoped: scoped}, [Invokee, function (inherited) {		
+		return {
+					
+			constructor: function (store) {
+				inherited.constructor.apply(this);
+				this.__store = store;
+			},
+			
+			storeInvoke: function (member, data, context) {
+				return this["__" + member](data, context);
+			},
+			
+			__insert: function (data, context) {
+				return this.__store.insert(data, context);
+			},
+		
+			__remove: function (id, context) {
+				return this.__store.remove(id, context);
+			},
+
+			__get: function (id, context) {
+				return this.__store.get(id, context);
+			},
+
+			__update: function (data, context) {
+				return this.__store.update(data.id, data.data, context);
+			},
+
+			__query: function (data, context) {
+				return this.__store.query(data.query, data.options, context);
+			}
+
+		};
+	}]);
+});
+Scoped.define("module:Stores.Invokers.StoreInvokeeRestInvoker", [
+    "base:Class",
+    "base:Objs",
+    "base:Types",
+    "json:",
+    "module:Stores.Invokers.StoreInvokee"
+], function (Class, Objs, Types, JSON, Invokee, scoped) {
+	return Class.extend({scoped: scoped}, [Invokee, function (inherited) {
+		return {
+			
+			constructor: function (restInvokee, options) {
+				inherited.constructor.call(this);
+				this.__restInvokee = restInvokee;
+				this.__options = Objs.tree_extend({
+					methodMap: {
+						"insert": "POST",
+						"get": "GET",
+						"remove": "DELETE",
+						"update": "PUT",
+						"query": "GET" 
+					},
+					toMethod: null,
+					dataMap: {
+						"insert": function (data, context) { return data; },
+						"update": function (data, context) { return data.data; }
+					},
+					toData: null,
+					getMap: {
+						"query": function (data, context) {
+							var result = {};
+							if (data.query && !Types.is_empty(data.query))
+								result.query = JSON.stringify(data.query);
+							result = Objs.extend(result, data.options);
+							return result;
+						}
+					},
+					toGet: null,
+					baseURI: "/",
+					uriMap: {
+						"get": function (id, context) { return id; },
+						"remove": function (id, context) { return id; },
+						"update": function (data, context) { return data.id; }
+					},
+					toURI: null,
+					context: this
+				}, options);
+			},
+			
+			storeInvoke: function (member, data, context) {
+				return this.__restInvokee.restInvoke(
+					this._toMethod(member, data, context),
+					this._toURI(member, data, context),
+					this._toData(member, data, context),
+					this._toGet(member, data, context)
+				);
+			},
+			
+			_toMethod: function (member, data, context) {
+				var method = null;
+				if (this.__options.toMethod)
+					method = this.__options.toMethod.call(this.__options.context, member, data, context);
+				return method || this.__options.methodMap[member];
+			},
+			
+			_toURI: function (member, data, context) {
+				var base = Types.is_function(this.__options.baseURI) ? this.__options.baseURI.call(this.__options.context, context) : this.__options.baseURI;
+				if (this.__options.toURI) {
+					var ret = this.__options.toURI.call(this.__options.context, member, data, context);
+					if (ret)
+						return base + ret;
+				}
+				return base + (member in this.__options.uriMap ? (Types.is_function(this.__options.uriMap[member]) ? this.__options.uriMap[member].call(this.__options.context, data, context): this.__options.uriMap[member]) : "");
+			},
+			
+			_toData: function (member, data, context) {
+				var result = null;
+				if (this.__options.toData)
+					result = this.__options.toData.call(this.__options.context, member, data, context);
+				return result || (member in this.__options.dataMap ? this.__options.dataMap[member].call(this.__options.context, data, context) : null);
+			},
+			
+			_toGet: function (member, data, context) {
+				var result = null;
+				if (this.__options.toGet)
+					result = this.__options.toGet.call(this.__options.context, member, data, context);
+				return result || (member in this.__options.getMap ? this.__options.getMap[member].call(this.__options.context, data, context) : null);
+			}
+			
+			
+		};
+	}]);
+});
+
+
+Scoped.define("module:Stores.Invokers.RouteredRestInvokeeStoreInvoker", [
+     "base:Class",
+     "base:Objs",
+     "base:Types",
+     "json:",
+     "module:Stores.Invokers.RouteredRestInvokee"
+ ], function (Class, Objs, Types, JSON, Invokee, scoped) {
+ 	return Class.extend({scoped: scoped}, [Invokee, function (inherited) {
+ 		return {
+
+			constructor: function (storeInvokee, options) {
+				inherited.constructor.call(this);
+				this.__storeInvokee = storeInvokee;
+				this.__options = Objs.tree_extend({
+					dataMap: {
+						"insert": function (member, uriData, post, get, ctx) {
+							return post;
+						},
+						"update": function (member, uriData, post, get, ctx) {
+							return {
+								id: uriData.id,
+								data: post
+							};
+						},
+						"get": function (member, uriData, post, get, ctx) {
+							return uriData.id;
+						},
+						"remove": function (member, uriData, post, get, ctx) {
+							return uriData.id;
+						},
+						"query": function (member, uriData, post, get, ctx) {
+							var result = {};
+							if (get.query)
+								result.query = JSON.parse(get.query);
+							var opts = Objs.clone(get, 1);
+							delete opts.query;
+							if (!Types.is_empty(opts))
+								result.options = opts;
+							return result;
+						}
+					},
+					toData: null,
+					contextMap: {},
+					toContext: function (member, uriData, post, get, ctx) {
+						return ctx;
+					},
+					context: this
+				}, options);
+			},
+			
+			routeredRestInvoke: function (member, uriData, post, get, ctx) {
+				return this.__storeInvokee.storeInvoke(
+					member,
+					this._toData(member, uriData, post, get, ctx),
+					this._toContext(member, uriData, post, get, ctx)
+				);
+ 			},
+ 			
+ 			_toData: function (member, uriData, post, get, ctx) {
+				var data = null;
+				if (this.__options.toData)
+					data = this.__options.toData.call(this.__options.context, member, uriData, post, get, ctx);
+				return data || (member in this.__options.dataMap ? this.__options.dataMap[member].call(this.__options.context, member, uriData, post, get, ctx) : null);
+ 			},
+ 			
+ 			_toContext: function (member, uriData, post, get, ctx) {
+				var data = null;
+				if (this.__options.toContext)
+					data = this.__options.toContext.call(this.__options.context, member, uriData, post, get, ctx);
+				return data || (member in this.__options.contextMap ? this.__options.contextMap[member].call(this.__options.context, member, uriData, post, get, ctx) : null);
+ 			}
+ 		
+		};
+	}]);
+});
+
+
+Scoped.define("module:Stores.Invokers.RestInvokeeStoreInvoker", [
+     "module:Stores.Invokers.RouteredRestInvokeeStoreInvoker",
+     "module:Stores.Invokers.RestInvokee",
+     "base:Router.RouteParser",
+     "base:Objs",
+     "base:Types"
+ ], function (Class, Invokee, RouteParser, Objs, Types, scoped) {
+ 	return Class.extend({scoped: scoped}, [Invokee, function (inherited) {
+ 		return {
+ 			
+			constructor: function (storeInvokee, options) {
+				inherited.constructor.call(this, storeInvokee, Objs.tree_extend({
+					baseURI: "/",
+					methodMap: {
+						"insert": "POST",
+						"get": "GET",
+						"remove": "DELETE",
+						"update": "PUT",
+						"query": "GET" 
+					},
+					toMethod: null,
+					uriMap: {
+						"get": "(id:.+)",
+						"remove": "(id:.+)",
+						"update": "(id:.+)"
+					},
+					toURI: null
+				}, options));
+				this.__routes = {};
+				Objs.iter(this.__options.methodMap, function (method, member) {
+					var s = "";
+					var base = Types.is_function(this.__options.baseURI) ? this.__options.baseURI.call(this.__options.context) : this.__options.baseURI;
+					if (this.__options.toURI) {
+						var ret = this.__options.toURI.call(this.__options.context, member);
+						if (ret)
+							s = base + ret;
+					}
+					if (!s)
+						s = base + (member in this.__options.uriMap ? (Types.is_function(this.__options.uriMap[member]) ? this.__options.uriMap[member].call(this.__options.context): this.__options.uriMap[member]) : "");
+					this.__routes[member] = method + " " + s;
+				}, this);
+				this.__routeParser = this.auto_destroy(new RouteParser(this.__routes));
+			},
+			
+ 			restInvoke: function (method, uri, post, get, ctx) {
+ 				var routed = this.__routeParser.parse(method + " " + uri);
+ 				return this.routeredRestInvoke(routed.name, routed.args, post, get, ctx);
+ 			}
+			
+		};
+	}]);
+});
+
 
 Scoped.define("module:Stores.CachedStore", [
                                             "module:Stores.BaseStore",
@@ -1922,7 +2678,9 @@ Scoped.define("module:Stores.CachedStore", [
 				}, options);
 				this.remoteStore = remoteStore;
 				this._online = true;
-				this.itemCache = this._options.itemCache || this.auto_destroy(new MemoryStore());
+				this.itemCache = this._options.itemCache || this.auto_destroy(new MemoryStore({					
+					id_key: remoteStore.id_key()
+				}));
 				this.queryCache = this._options.queryCache || this.auto_destroy(new MemoryStore());
 				this.cacheStrategy = this._options.cacheStrategy || this.auto_destroy(new ExpiryCacheStrategy());
 				if (this._options.auto_cleanup) {
@@ -2705,355 +3463,26 @@ Scoped.define("module:Stores.PartialStoreWriteStrategies.CommitStrategy", [
 	});
 });
 
-Scoped.define("module:Stores.RemoteStoreException", [
-                                                     "module:Stores.StoreException",
-                                                     "base:Net.AjaxException"
-                                                     ], function (StoreException, AjaxException, scoped) {
-	return StoreException.extend({scoped: scoped}, function (inherited) {			
-		return {
-
-			constructor: function (source) {
-				source = AjaxException.ensure(source);
-				inherited.constructor.call(this, source.toString());
-				this.__source = source;
-			},
-
-			source: function () {
-				return this.__source;
-			}
-
-		};
-	});
-});
-
-
-/**
- * @class RemoteStore
- *
- * RemoteStore is a store designed to be used with remote data. It is also
- * extended to create a queriable remote store.
- */
 Scoped.define("module:Stores.RemoteStore", [
-                                            "module:Stores.BaseStore",
-                                            "module:Stores.RemoteStoreException",
-                                            "base:Objs",
-                                            "base:Types",
-                                            "json:"
-                                            ], function (BaseStore, RemoteStoreException, Objs, Types, JSON, scoped) {
-	return BaseStore.extend({scoped: scoped}, function (inherited) {			
-		return {
-
-			/**
-			 * @method constructor
-			 *
-			 * @param {string} uri The remote endpoint where the queriable data is accessible.
-			 * @param {object} ajax An instance of an concrete implementation of
-			 * BetaJS.Net.AbstractAjax. Whether BetaJS.Data is being used in
-			 * the client or server dictates which implementation of Ajax to use.
-			 * @param {object} options The options for the RemoteStore. Currently the
-			 * supported options are "update_method" and "uri_mappings".
-			 *
-			 * @example
-			 * // Returns new instance of RemoteStore
-			 * new RemoteStore('/api/v1/people', new BetaJS.Browser.JQueryAjax(), {})
-			 */
-			constructor : function(uri, ajax, options) {
-				inherited.constructor.call(this, options);
-				this._uri = uri;
-				this.__ajax = ajax;
-				this.__options = Objs.extend({
-					"update_method": "PUT",
-					"uri_mappings": {}
-				}, options || {});
-			},
-
-			/**
-			 * @method getUri
-			 *
-			 * @return {string} The uri instance variable.
-			 */
-			getUri: function () {
-				return this._uri;
-			},
-
-			/**
-			 * @method prepare_uri
-			 *
-			 * @param {string} action The action to be performed on the remote data
-			 * store. For example, remove, get...
-			 * @param {object} data The data on which the action will be performed.
-			 * For example, the object being updated.
-			 *
-			 * @return {string} The uri to be used to perform the specified action on
-			 * the specified data.
-			 */
-			prepare_uri: function (action, data) {
-				if (this.__options.uri_mappings[action])
-					return this.__options.uri_mappings[action](data);
-				if (action == "remove" || action == "get" || action == "update")
-					return this.getUri() + "/" + data[this._id_key];
-				return this.getUri();
-			},
-
-			/**
-			 * @method _encode_query
-			 *
-			 * @param {object} query The query object.
-			 * @param {object} options Options for the specified query.
-			 *
-			 * @protected
-			 *
-			 * @return {string} A uri to perform the specified query.
-			 */
-			_encode_query: function (query, options) {
-				return {
-					uri: this.prepare_uri("query")
-				};		
-			},
-
-			/**
-			 * @method __invoke
-			 *
-			 * Invoke the specified operation on the remote data store.
-			 *
-			 * @param {object} options The options for the ajax.asyncCall. Specifies
-			 * the method, uri, and data. See "_insert" for an example.
-			 * @param {boolean} parse_json Boolean flag indicating if the response
-			 * should be parsed as json.
-			 *
-			 * @private
-			 *
-			 * @return {object} The remote response from invoking the specified
-			 * operation.
-			 */
-			__invoke: function (options, parse_json) {
-				return this.__ajax.asyncCall(options).mapCallback(function (e, result) {
-					if (e)
-						return new RemoteStoreException(e);
-					if (parse_json && Types.is_string(result)) {
-						try {
-							result = JSON.parse(result);
-						} catch (ex) {}
-					}
-					return result;
-				});
-			},
-
-			/**
-			 * @method _insert
-			 *
-			 * Insert the given data into the remote store.
-			 *
-			 * @param {object} data The data to be inserted.
-			 *
-			 * @protected
-			 *
-			 * @return {object} The result of invoking insert.
-			 */
-			_insert : function(data) {
-				return this.__invoke({
-					method: "POST",
-					uri: this.prepare_uri("insert", data),
-					data: data
-				}, true);
-			},
-
-			/**
-			 * @method _get
-			 *
-			 * Get the data specified by the id parameter from the remote store.
-			 *
-			 * @param {int} id The id of the data to be retrieved.
-			 *
-			 * @protected
-			 *
-			 * @return {object} The desired data.
-			 */
-			_get : function(id) {
-				var data = {};
-				data[this._id_key] = id;
-				return this.__invoke({
-					uri: this.prepare_uri("get", data)
-				});
-			},
-
-			/**
-			 * @method _update
-			 *
-			 * Update data.
-			 *
-			 * @param {int} id The id of the data to be updated.
-			 * @param {object} data The new data to be used for the update.
-			 *
-			 * @protected
-			 *
-			 * @return {object} The result of invoking the update operation on the
-			 * remote store.
-			 */
-			_update : function(id, data) {
-				var copy = Objs.clone(data, 1);
-				copy[this._id_key] = id;
-				return this.__invoke({
-					method: this.__options.update_method,
-					uri: this.prepare_uri("update", copy),
-					data: data
-				});
-			},
-
-			/**
-			 * @method _remove
-			 *
-			 * Remove data.
-			 *
-			 * @param {int} id The id of the data to be removed.
-			 *
-			 * @protected
-			 *
-			 * @return {object} The result of invoking the remove operation on the
-			 * remote store.
-			 */
-			_remove : function(id) {
-				var data = {};
-				data[this._id_key] = id;
-				return this.__invoke({
-					method: "DELETE",
-					uri: this.prepare_uri("remove", data)
-				});
-			},
-
-			/**
-			 * @method _query
-			 *
-			 * Query the remote store.
-			 *
-			 * @param {object} query The query object specifying the query fields and
-			 * their respective values.
-			 * @param {object} options The options object specifying which options are
-			 * set, and what the respective values are.
-			 *
-			 * @protected
-			 *
-			 * @return {object} The result of invoking the query operation on the
-			 * remote store.
-			 */
-			_query : function(query, options) {
-				return this.__invoke(this._encode_query(query, options), true);
-			}	
-
+    "module:Stores.Invokers.InvokerStore",
+    "module:Stores.Invokers.StoreInvokeeRestInvoker",
+    "module:Stores.Invokers.RestInvokeeAjaxInvoker"
+], function (Store, RestInvoker, AjaxInvoker, scoped) {
+ 	return Store.extend({scoped: scoped}, function (inherited) {
+ 		return {
+ 			
+ 			constructor: function (ajax, restOptions, storeOptions) {
+ 				var ajaxInvoker = new AjaxInvoker(ajax);
+ 				var restInvoker = new RestInvoker(ajaxInvoker, restOptions);
+ 				inherited.constructor.call(this, restInvoker, storeOptions);
+ 				this.auto_destroy(restInvoker);
+ 				this.auto_destroy(ajaxInvoker);
+			}			
+		
 		};
 	});
 });
 
-
-/**
- * @class QueryGetParamsRemoteStore
- *
- * QueryGetParamsRemoteStore should be used if the following conditions are met.
- * - Data is remotely accessible. For example, accessible through REST ajax
- *   calls.
- * - Data is quierable and will be queried. 
- *
- * @augments RemoteStore
- */
-Scoped.define("module:Stores.QueryGetParamsRemoteStore", [
-                                                          "module:Queries",
-                                                          "module:Stores.RemoteStore",
-                                                          "json:"
-                                                          ], function (Queries, RemoteStore, JSON, scoped) {
-	return RemoteStore.extend({scoped: scoped}, function (inherited) {			
-		return {
-
-			/**
-			 * @inheritdoc
-			 *
-			 * @param {Object} capability_params An object representing the remote
-			 * endpoints querying capabilities. The keys are
-			 * query aspects the remote data source can handle. The values are the
-			 * identifiers for these capabilites in the uri. For example, if a server
-			 * can process the skip field in a query, and expects the skip fields to
-			 * be called "jump" in the Uri, the capability_param object would be
-			 * `{"skip": "jump"}`.
-			 * @param {Object} options
-			 *
-			 * @example <caption>Creation of client side QueryGetParamsRemoteStore</caption>
-			 * // returns new QueryGetParamsRemoteStore
-			 * new QueryGetParamsRemoteStore('api/v1/people',
-			 *                                new BetaJS.Browser.JQueryAjax(),
-			 *                                {"skip": "skip", "query": "query"});
-			 *
-			 * @return {QueryGetParamsRemoteStore} The newly constructed instance of
-			 * QueryGetParamsRemoteStore.
-			 */
-			constructor : function(uri, ajax, capability_params, options) {
-				inherited.constructor.call(this, uri, ajax, options);
-				this.__capability_params = capability_params;
-			},
-
-			/**
-			 * @method _query_capabilities
-			 *
-			 * Helper method for dealing with capability_params.
-			 *
-			 * @protected
-			 *
-			 * @return {object} Key/value object where key is possible capability
-			 * parameter and value is if that capability_parameter is included for
-			 * this instance.
-			 */
-			_query_capabilities: function () {
-				var caps = {};
-				if ("skip" in this.__capability_params)
-					caps.skip = true;
-				if ("limit" in this.__capability_params)
-					caps.limit = true;
-				if ("query" in this.__capability_params)
-					caps.query = Queries.fullQueryCapabilities();
-				if ("sort" in this.__capability_params)
-					caps.sort = true;
-				return caps;
-			},
-
-			/**
-			 * @method _encode_query
-			 *
-			 * Helper method that encodes the query and the options into a uri to send
-			 * to the remote data source.
-			 *
-			 * @param {object} query A query to be encoded into uri form. The query
-			 * will only be included in the uri if "query" was included in the
-			 * capability_params during this instances construction.
-			 * @param {object} options A set of options to be encoded into uri form.
-			 *
-			 * @protected
-			 *
-			 * @TODO Include the option of including the query param in the uri as a
-			 * simple list of keys and values. For example, if the query param is
-			 * `{'test': 'hi'}`, the uri becomes 'BASE_URL?test=hi&MORE_PARAMS'
-			 * instead of 'BASE_URL?query={"test":"hi"}&MORE_PARAMS'. This change
-			 * would increase the number of server/api configurations that could use
-			 * this method of encoding queries.
-			 *
-			 * @return {object} The only key is the uri, and the associated value is
-			 * the uri representing the query and the options.
-			 */
-			_encode_query: function (query, options) {
-				options = options || {};
-				var uri = this.getUri() + "?"; 
-				if (options.skip && "skip" in this.__capability_params)
-					uri += this.__capability_params.skip + "=" + options.skip + "&";
-				if (options.limit && "limit" in this.__capability_params)
-					uri += this.__capability_params.limit + "=" + options.limit + "&";
-				if (options.sort && "sort" in this.__capability_params)
-					uri += this.__capability_params.sort + "=" + JSON.stringify(options.sort) + "&";
-				if ("query" in this.__capability_params)
-					uri += this.__capability_params.query + "=" + JSON.stringify(query) + "&";
-				return {
-					uri: uri
-				};		
-			}
-		};
-	});
-});
 Scoped.define("module:Stores.SocketStore", [
                                             "module:Stores.BaseStore",
                                             "base:Objs"
@@ -3065,7 +3494,6 @@ Scoped.define("module:Stores.SocketStore", [
 				inherited.constructor.call(this, options);
 				this.__socket = socket;
 				this.__prefix = prefix;
-				this._supportsAsync = false;
 			},
 
 			/** @suppress {missingProperties} */
@@ -3673,12 +4101,12 @@ Scoped.define("module:Stores.MemoryIndex", [
 });
 
 /**
- * @class QueryCollection
+ * @class AbstractQueryCollection
  *
  * A base class for querying collections. Subclasses specify the expected type
  * of data store and specify whether the query collection is active.
  */
-Scoped.define("module:Collections.QueryCollection", [      
+Scoped.define("module:Collections.AbstractQueryCollection", [      
                                                      "base:Collections.Collection",
                                                      "base:Objs",
                                                      "base:Types",
@@ -4066,7 +4494,7 @@ Scoped.define("module:Collections.QueryCollection", [
 
 
 Scoped.define("module:Collections.StoreQueryCollection", [      
-                                                          "module:Collections.QueryCollection",
+                                                          "module:Collections.AbstractQueryCollection",
                                                           "base:Objs"
                                                           ], function (QueryCollection, Objs, scoped) {
 	return QueryCollection.extend({scoped: scoped}, function (inherited) {
@@ -4102,7 +4530,7 @@ Scoped.define("module:Collections.StoreQueryCollection", [
 });
 
 Scoped.define("module:Collections.TableQueryCollection", [      
-                                                          "module:Collections.QueryCollection",
+                                                          "module:Collections.AbstractQueryCollection",
                                                           "base:Objs"
                                                           ], function (QueryCollection, Objs, scoped) {
 	return QueryCollection.extend({scoped: scoped}, function (inherited) {
@@ -4198,12 +4626,13 @@ Scoped.define("module:Modelling.Model", [
 	return AssociatedProperties.extend({scoped: scoped}, function (inherited) {			
 		return {
 
-			constructor: function (attributes, table, options) {
+			constructor: function (attributes, table, options, ctx) {
 				this.__table = table;
 				this.__options = Objs.extend({
 					newModel: true,
 					removed: false
 				}, options);
+				this.__ctx = ctx;
 				this.__silent = 1;
 				inherited.constructor.call(this, attributes);
 				this.__silent = 0;
@@ -4295,10 +4724,16 @@ Scoped.define("module:Modelling.Model", [
 							return Promise.create(attrs);
 					}
 					var wasNew = this.isNew();
-					var promise = this.isNew() ? this.__table.store().insert(attrs) : this.__table.store().update(this.id(), attrs);
+					var promise = this.isNew() ? this.__table.store().insert(attrs, this.__ctx) : this.__table.store().update(this.id(), attrs, this.__ctx);
 					return promise.mapCallback(function (err, result) {
-						if (err)
-							return Exceptions.ensure(this.validation_exception_conversion(err));
+						if (err) {
+							if (err.data) {
+								Objs.iter(err.data, function (value, key) {
+									this.setError(key, value);
+								}, this);
+							}
+							return Exceptions.ensure(new ModalInvalidException(this));
+						}
 						this.__silent++;
 						this.setAll(result);
 						this.__silent--;
@@ -4316,7 +4751,7 @@ Scoped.define("module:Modelling.Model", [
 			remove: function () {
 				if (this.isNew() || this.isRemoved())
 					return Promise.create(true);
-				return this.__table.store().remove(this.id()).mapSuccess(function (result) {
+				return this.__table.store().remove(this.id(), this.__ctx).mapSuccess(function (result) {
 					this.trigger("remove");		
 					this.__options.removed = true;
 					return result;
@@ -4330,11 +4765,8 @@ Scoped.define("module:Modelling.SchemedProperties", [
                                                      "base:Properties.Properties",
                                                      "base:Types",
                                                      "base:Promise",
-                                                     "base:Objs",
-                                                     "module:Stores.RemoteStoreException",
-                                                     "base:Net.HttpHeader",
-                                                     "module:Modelling.ModelInvalidException"
-                                                     ], function (Properties, Types, Promise, Objs, RemoteStoreException, HttpHeader, ModelInvalidException, scoped) {
+                                                     "base:Objs"
+                                                     ], function (Properties, Types, Promise, Objs, scoped) {
 	return Properties.extend({scoped: scoped}, function (inherited) {			
 		return {
 
@@ -4503,21 +4935,6 @@ Scoped.define("module:Modelling.SchemedProperties", [
 				for (var key in data)
 					if (key in scheme)
 						setInner.call(this, key);
-			},
-
-			validation_exception_conversion: function (e) {
-				var source = e;
-				if ("instance_of" in e && e.instance_of(RemoteStoreException))
-					source = e.source();
-				else if (!("status_code" in source && "data" in source))
-					return e;
-				if (source.status_code() == HttpHeader.HTTP_STATUS_PRECONDITION_FAILED && source.data()) {
-					Objs.iter(source.data(), function (value, key) {
-						this.setError(key, value);
-					}, this);
-					e = new ModelInvalidException(this);
-				}
-				return e;		
 			}
 
 		};
@@ -4585,6 +5002,10 @@ Scoped.define("module:Modelling.AssociatedProperties", [
 
 			id: function () {
 				return this.get(this.cls.primary_key());
+			},
+			
+			pid: function () {
+				return this.id();
 			},
 
 			hasId: function () {
@@ -4656,19 +5077,19 @@ Scoped.define("module:Modelling.Table", [
 				return Types.is_string(cls) ? Scoped.getGlobal(cls) : cls;
 			},
 
-			newModel: function (attributes, cls) {
+			newModel: function (attributes, cls, ctx) {
 				cls = this.modelClass(cls);
-				var model = new cls(attributes, this);
+				var model = new cls(attributes, this, {}, ctx);
 				if (this.__options.auto_create)
 					model.save();
 				return model;
 			},
 
-			materialize: function (obj) {
+			materialize: function (obj, ctx) {
 				if (!obj)
 					return null;
 				var cls = this.modelClass(this.__options.type_column && obj[this.__options.type_column] ? this.__options.type_column : null);
-				return new cls(obj, this, {newModel: false});
+				return new cls(obj, this, {newModel: false}, ctx);
 			},
 
 			options: function () {
@@ -4679,20 +5100,22 @@ Scoped.define("module:Modelling.Table", [
 				return this.__store;
 			},
 
-			findById: function (id) {
-				return this.__store.get(id).mapSuccess(this.materialize, this);
+			findById: function (id, ctx) {
+				return this.__store.get(id, ctx).mapSuccess(function (obj) {
+					return this.materialize(obj, ctx);
+				}, this);
 			},
 
-			findBy: function (query) {
-				return this.allBy(query, {limit: 1}).mapSuccess(function (iter) {
+			findBy: function (query, ctx) {
+				return this.allBy(query, {limit: 1}, ctx).mapSuccess(function (iter) {
 					return iter.next();
 				});
 			},
 
-			allBy: function (query, options) {
-				return this.__store.query(query, options).mapSuccess(function (iterator) {
+			allBy: function (query, options, ctx) {
+				return this.__store.query(query, options, ctx).mapSuccess(function (iterator) {
 					return new MappedIterator(iterator, function (obj) {
-						return this.materialize(obj);
+						return this.materialize(obj, ctx);
 					}, this);
 				}, this);
 			},
@@ -4701,8 +5124,8 @@ Scoped.define("module:Modelling.Table", [
 				return (Types.is_string(this.__model_type) ? Scoped.getGlobal(this.__model_type) : this.__model_type).primary_key();
 			},
 
-			all: function (options) {
-				return this.allBy({}, options);
+			all: function (options, ctx) {
+				return this.allBy({}, options, ctx);
 			},
 
 			query: function () {

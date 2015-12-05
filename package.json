@@ -1,6 +1,6 @@
 {
 	"name": "betajs-server",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"description": "BetaJS-Server is a server-side JavaScript framework extension for BetaJS.",
 	"homepage": "http://betajs.com",
 	"contributors": ["Oliver Friedmann"],
@@ -20,7 +20,8 @@
 		"grunt-wget": "",
 		"grunt-jsdoc": "beta",
 		"grunt-shell": "",
-		"grunt-template": ""
+		"grunt-template": "",
+		"grunt-betajs-docs-compile": ""
 	},
 	"repository": {
 		"type": "git",
