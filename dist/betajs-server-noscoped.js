@@ -1,5 +1,5 @@
 /*!
-betajs-server - v1.0.2 - 2015-12-05
+betajs-server - v1.0.3 - 2015-12-13
 Copyright (c) Oliver Friedmann
 MIT Software License.
 */
@@ -15,10 +15,12 @@ Scoped.binding("data", "global:BetaJS.Data");
 Scoped.define("module:", function () {
 	return {
 		guid: "9955100d-6a88-451f-9a85-004523eb8589",
-		version: '23.1449326417666'
+		version: '24.1449984106928'
 	};
 });
 
+Scoped.assumeVersion("base:version", 444);
+Scoped.assumeVersion("data:version", 56);
 Scoped.define("module:Net.HttpAjax", [      
         "base:Net.AbstractAjax",
         "base:Promise",

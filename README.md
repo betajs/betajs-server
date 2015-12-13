@@ -1,4 +1,4 @@
-# betajs-server 1.0.2
+# betajs-server 1.0.3
 
 BetaJS-Server is a server-side JavaScript framework extension for BetaJS.
 

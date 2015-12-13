@@ -1,5 +1,5 @@
 /*!
-betajs-data - v1.0.7 - 2015-12-05
+betajs-data - v1.0.10 - 2015-12-13
 Copyright (c) Oliver Friedmann
 MIT Software License.
 */
@@ -14,10 +14,11 @@ Scoped.binding("json", "global:JSON");
 Scoped.define("module:", function () {
 	return {
 		guid: "70ed7146-bb6d-4da4-97dc-5a8e2d23a23f",
-		version: '53.1449325779182'
+		version: '56.1449983960268'
 	};
 });
 
+Scoped.assumeVersion("base:version", 444);
 Scoped.define("module:Queries.Constrained", [
                                              "json:",
                                              "module:Queries",
@@ -1484,8 +1485,9 @@ Scoped.define("module:Stores.ContextualizedStore", [
 Scoped.define("module:Stores.DecontextualizedSelectStore", [
 	"module:Stores.BaseStore",
 	"base:Iterators.MappedIterator",
-	"base:Promise"
-], function (BaseStore, MappedIterator, Promise, scoped) {
+	"base:Promise",
+	"base:Objs"
+], function (BaseStore, MappedIterator, Promise, Objs, scoped) {
    	return BaseStore.extend({scoped: scoped}, function (inherited) {			
    		return {
 
@@ -5106,8 +5108,8 @@ Scoped.define("module:Modelling.Table", [
 				}, this);
 			},
 
-			findBy: function (query, ctx) {
-				return this.allBy(query, {limit: 1}, ctx).mapSuccess(function (iter) {
+			findBy: function (query, options, ctx) {
+				return this.allBy(query, Objs.extend({limit: 1}, options), ctx).mapSuccess(function (iter) {
 					return iter.next();
 				});
 			},

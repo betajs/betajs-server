@@ -13,3 +13,6 @@ Scoped.define("module:", function () {
 		version: '/* @echo MAJOR_VERSION */./* @echo MINOR_VERSION */'
 	};
 });
+
+Scoped.assumeVersion("base:version", 444);
+Scoped.assumeVersion("data:version", 56);
