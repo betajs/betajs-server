@@ -1,5 +1,5 @@
 /*!
-betajs-server - v1.0.3 - 2015-12-13
+betajs-server - v1.0.3 - 2015-12-20
 Copyright (c) Oliver Friedmann
 MIT Software License.
 */
@@ -670,7 +670,7 @@ Public.exports();
 	return Public;
 }).call(this);
 /*!
-betajs-server - v1.0.3 - 2015-12-13
+betajs-server - v1.0.3 - 2015-12-20
 Copyright (c) Oliver Friedmann
 MIT Software License.
 */
@@ -686,7 +686,7 @@ Scoped.binding("data", "global:BetaJS.Data");
 Scoped.define("module:", function () {
 	return {
 		guid: "9955100d-6a88-451f-9a85-004523eb8589",
-		version: '24.1449984106928'
+		version: '25.1450643756771'
 	};
 });
 
@@ -1948,6 +1948,16 @@ Scoped.define("module:Stores.MongoDatabaseStore", [
 			
 			table: function () {
 				return this.store().table();
+			},
+			
+			_encodeSort: function (data) {
+				var result = {};
+				Objs.iter(data, function (value, key) {
+					if (key === "id")
+						key = "_id";
+					result[key] = value;
+				});
+				return result;
 			},
 			
 			_encodeData: function (data) {

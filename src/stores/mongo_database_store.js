@@ -20,6 +20,16 @@ Scoped.define("module:Stores.MongoDatabaseStore", [
 				return this.store().table();
 			},
 			
+			_encodeSort: function (data) {
+				var result = {};
+				Objs.iter(data, function (value, key) {
+					if (key === "id")
+						key = "_id";
+					result[key] = value;
+				});
+				return result;
+			},
+			
 			_encodeData: function (data) {
 				var result = Objs.map(data, function (value, key) {
 					if (this._types[key] === "id")
