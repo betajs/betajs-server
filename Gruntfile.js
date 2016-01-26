@@ -154,7 +154,15 @@ module.exports = function(grunt) {
 							}
 						},
 						files : {
-							"jsdoc.conf.json": ["json.tpl"]
+							"jsdoc.conf.json": ["compile/json.tpl"]
+						}
+					},
+					"license" : {
+						options : {
+							data: grunt.file.readJSON('package.json')
+						},
+						files : {
+							"LICENSE" : ["compile/license.tpl"]
 						}
 					},
 					"readme" : {
@@ -165,7 +173,7 @@ module.exports = function(grunt) {
 							}
 						},
 						files : {
-							"README.md" : ["readme.tpl"]
+							"README.md" : ["compile/readme.tpl"]
 						}
 					}
 				}
@@ -193,6 +201,7 @@ module.exports = function(grunt) {
 	grunt.registerTask('dependencies', [ 'wget:dependencies' ]);
 	grunt.registerTask('closure', [ 'closureCompiler', 'clean:closure' ]);
 	grunt.registerTask('readme', [ 'template:readme' ]);
+	grunt.registerTask('license', [ 'template:license' ]);
 
 };
 
