@@ -1,7 +1,7 @@
 /*!
-betajs - v1.0.23 - 2015-12-16
+betajs - v1.0.30 - 2016-01-31
 Copyright (c) Oliver Friedmann,Victor Lingenthal
-MIT Software License.
+Apache 2.0 Software License.
 */
 (function () {
 
@@ -12,7 +12,7 @@ Scoped.binding("module", "global:BetaJS");
 Scoped.define("module:", function () {
 	return {
 		guid: "71366f7a-7da3-4e55-9a0b-ea0e4e2a9e79",
-		version: '446.1450314041414'
+		version: '455.1454268108075'
 	};
 });
 
@@ -62,6 +62,11 @@ Scoped.define("module:Async", ["module:Types", "module:Functions"], function (Ty
 				clearTimeout(timer);
 				args.func.apply(args.context || this, args.params || []);
 			}, args.time || 0);
+			return timer;
+		},
+		
+		clearEventually: function (ev) {
+			clearTimeout(ev);
 		},
 		
 		eventuallyOnce: function (func, params, context) {
@@ -78,7 +83,7 @@ Scoped.define("module:Async", ["module:Types", "module:Functions"], function (Ty
 			this.__eventuallyOnceIdx++;
 			var index = this.__eventuallyOnceIdx;
 			this.__eventuallyOnce[index] = data;
-			this.eventually(function () {
+			return this.eventually(function () {
 				delete this.__eventuallyOnce[index];
 				func.apply(context || this, params || []);
 			}, this);
@@ -575,6 +580,39 @@ Scoped.define("module:Class", ["module:Types", "module:Objs", "module:Functions"
 		return this.cls.ancestor_of(cls);
 	};
 	
+	Class.prototype.inspect = function () {
+		return {
+			header: {
+				cid: this.cid(),
+				classname: this.cls.classname,
+				destroyed: this.destroyed()
+			},
+			attributes: {
+				attributes_public: Objs.filter(this, function (value, key) {
+					return !Types.is_function(value) && key.indexOf("_") !== 0;
+				}, this),
+				attributes_protected: Objs.filter(this, function (value, key) {
+					return !Types.is_function(value) && key.indexOf("_") === 0 && key.indexOf("__") !== 0;
+				}, this),
+				attributes_private: Objs.filter(this, function (value, key) {
+					return !Types.is_function(value) && key.indexOf("__") === 0;
+				}, this)
+			},
+			methods: {
+				methods_public: Objs.filter(this, function (value, key) {
+					return Types.is_function(value) && key.indexOf("_") !== 0;
+				}, this),
+				methods_protected: Objs.filter(this, function (value, key) {
+					return Types.is_function(value) && key.indexOf("_") === 0 && key.indexOf("__") !== 0;
+				}, this),
+				method_private: Objs.filter(this, function (value, key) {
+					return Types.is_function(value) && key.indexOf("__") === 0;
+				}, this)
+			}
+		};
+	};
+
+	
 	// Legacy Methods
 	
 	Class.prototype._auto_destroy = function(obj) {
@@ -584,7 +622,7 @@ Scoped.define("module:Class", ["module:Types", "module:Objs", "module:Functions"
 	Class.prototype._inherited = function (cls, func) {
 		return cls.parent.prototype[func].apply(this, Array.prototype.slice.apply(arguments, [2]));
 	};
-		
+	
 	return Class;
 
 });
@@ -1757,7 +1795,10 @@ Scoped.define("module:Events.ListenMixin", ["module:Ids", "module:Objs"], functi
 Scoped.define("module:Events.Listen", ["module:Class", "module:Events.ListenMixin"], function (Class, Mixin, scoped) {
 	return Class.extend({scoped: scoped}, Mixin);
 });
-Scoped.define("module:Exceptions.Exception", ["module:Class"], function (Class, scoped) {
+Scoped.define("module:Exceptions.Exception", [
+    "module:Class",
+    "module:Comparators"
+], function (Class, Comparators, scoped) {
 	return Class.extend({scoped: scoped}, function (inherited) {
 		return {
 			
@@ -1789,7 +1830,11 @@ Scoped.define("module:Exceptions.Exception", ["module:Class"], function (Class, 
 					classname: this.cls.classname,
 					message: this.message()
 				};
-			}
+			},
+			
+			equals: function (other) {
+				return other && this.cls === other.cls && Comparators.deepEqual(this.json(), other.json(), -1);
+			}			
 			
 		};
 	});
@@ -3471,8 +3516,13 @@ Scoped.define("module:Parser.Lexer", ["module:Class", "module:Types", "module:Ob
 });
 
 
-Scoped.define("module:Promise", ["module:Types", "module:Functions", "module:Async"], function (Types, Functions, Async) {
-	return {		
+Scoped.define("module:Promise", [
+    "module:Types",
+    "module:Functions",
+    "module:Async",
+    "module:Objs"
+], function (Types, Functions, Async, Objs) {
+	var Promise = {		
 			
 		Promise: function (value, error, finished) {
 			this.__value = error ? null : (value || null);
@@ -3643,13 +3693,8 @@ Scoped.define("module:Promise", ["module:Types", "module:Functions", "module:Asy
 		}
 		
 	};
-});
-
-
-Scoped.extend("module:Promise.Promise.prototype", ["module:Promise", "module:Functions"], function (Promise, Functions) {
 	
-	return {
-		
+	Objs.extend(Promise.Promise.prototype, {
 		classGuid: "7e3ed52f-22da-4e9c-95a4-e9bb877a3935",
 		
 		success: function (f, context, options) {
@@ -3803,10 +3848,12 @@ Scoped.extend("module:Promise.Promise.prototype", ["module:Promise", "module:Fun
 			var result = Promise.and(this);
 			return result.and(promises);
 		}
-			
-	};
+	});
 	
+	return Promise;
 });
+
+
 Scoped.define("module:Properties.PropertiesMixin", [
     "module:Objs.Scopes",
     "module:Objs",
@@ -4022,7 +4069,7 @@ Scoped.define("module:Properties.PropertiesMixin", [
 				});
 				self.set(key, func.apply(args.context, values));
 			}
-			BetaJS.Objs.iter(deps, function (dep) {
+			Objs.iter(deps, function (dep) {
 				var value = dep.properties.get(dep.key);
 				// Ugly way of checking whether an EventsMixin is present - please improve in the future on this
 				if (value && typeof value == "object" && "on" in value && "off" in value && "trigger" in value) {
@@ -6942,9 +6989,9 @@ Scoped.define("module:Types", function () {
 		parseBool : function(x) {
 			if (this.is_boolean(x))
 				return x;
-			if (x == "true")
+			if (x === "true" || x === "")
 				return true;
-			if (x == "false")
+			if (x === "false")
 				return false;
 			return null;
 		},
@@ -7125,6 +7172,73 @@ Scoped.define("module:Classes.OptimisticConditionalInstance", [
 	});	
 });
 
+Scoped.define("module:Classes.LocaleMixin", function () {
+    return {
+
+        _clearLocale: function () {},
+        _setLocale: function (locale) {},
+
+        getLocale: function () {
+            return this.__locale;
+        },
+
+        clearLocale: function () {
+            this._clearLocale();
+            this.__locale = null;
+        },
+
+        setLocale: function (locale) {
+            this.clearLocale();
+            this.__locale = locale;
+            this._setLocale(locale);
+        },
+
+        isLocaleSet: function () {
+            return !!this.__locale;
+        },
+
+        setWeakLocale: function (locale) {
+            if (!this.isLocaleSet())
+                this.setLocale(locale);
+        }
+
+    };
+});
+
+
+
+Scoped.define("module:Classes.LocaleAggregator", [
+    "module:Class",
+    "module:Classes.LocaleMixin",
+    "module:Objs"
+], function (Class, LocaleMixin, Objs, scoped) {
+    return Class.extend({scoped: scoped}, [LocaleMixin, function (inherited) {
+        return {
+
+            constructor: function () {
+                inherited.constructor.call(this);
+                this.__locales = [];
+            },
+
+            register: function (obj) {
+                this.__locales.push(obj);
+            },
+
+            _clearLocale: function () {
+                Objs.iter(this.__locales, function (obj) {
+                    obj.clearLocale();
+                }, this);
+            },
+
+            _setLocale: function (locale) {
+                Objs.iter(this.__locales, function (obj) {
+                    obj.setLocale(locale);
+                }, this);
+            }
+
+        };
+    }]);
+});
 Scoped.define("module:Classes.Taggable", [
     "module:Objs"
 ], function (Objs) {
@@ -7183,8 +7297,11 @@ Scoped.define("module:Classes.StringTable", [
 				}
 			},
 			
-			__strings: {},
-			__cache: {},
+			constructor: function () {
+				inherited.constructor.call(this);
+				this.__cache = {};
+				this.__strings = {};
+			},
 			
 			__resolveKey: function (key, prefix) {
 				if (prefix)
@@ -7251,75 +7368,65 @@ Scoped.define("module:Classes.StringTable", [
 
 
 Scoped.define("module:Classes.LocaleTable", [
-	"module:Classes.StringTable"
-], function (StringTable, scoped) {
-	return StringTable.extend({scoped: scoped}, function (inherited) {
-		return {
-			
-			__locale: null,
-			
-			_localeTags: function (locale) {
-				if (!locale)
-					return null;
-				var result = [];
-				result.push("language:" + locale);
-				if (locale.indexOf("-") > 0)
-					result.push("language:" + locale.substring(0, locale.indexOf("-")));
-				return result;
-			},
+	"module:Classes.StringTable",
+	"module:Classes.LocaleMixin"
+], function (StringTable, LocaleMixin, scoped) {
+	return StringTable.extend({scoped: scoped}, [LocaleMixin, {
 
-			clearLocale: function () {
-				this.removeTags(this._localeTags(this.__locale));
-				this.__locale = null;
-			},
+		_localeTags: function (locale) {
+			if (!locale)
+				return null;
+			var result = [];
+			result.push("language:" + locale);
+			if (locale.indexOf("-") > 0)
+				result.push("language:" + locale.substring(0, locale.indexOf("-")));
+			return result;
+		},
+
+		_clearLocale: function () {
+			this.removeTags(this._localeTags(this.getLocale()));
+		},
+
+		_setLocale: function (locale) {
+			this.addTags(this._localeTags(locale));
+		}
 			
-			setLocale: function (locale) {
-				this.clearLocale();
-				this.__locale = this._localeTags(locale);
-				this.addTags(this.__locale);
-			},
-			
-			isLocaleSet: function () {
-				return !!this.__locale;
-			},
-			
-			setWeakLocale: function (locale) {
-				if (!this.isLocaleSet())
-					this.setLocale(locale);
-			}
-			
-		};
-	});
+	}]);
 });
-Scoped.define("module:Net.AjaxException", ["module:Exceptions.Exception"], function (Exception, scoped) {
+Scoped.define("module:Net.AjaxException", [
+    "module:Exceptions.Exception",
+    "module:Objs"
+], function (Exception, Objs, scoped) {
 	return Exception.extend({scoped: scoped}, function (inherited) {
 		return {
-		
+
 			constructor: function (status_code, status_text, data) {
 				inherited.constructor.call(this, status_code + ": " + status_text);
 				this.__status_code = status_code;
 				this.__status_text = status_text;
 				this.__data = data;
 			},
-			
+
 			status_code: function () {
 				return this.__status_code;
 			},
-			
+
 			status_text: function () {
 				return this.__status_text;
 			},
-			
+
 			data: function () {
 				return this.__data;
 			},
-			
+
 			json: function () {
-				var obj = inherited.json.call(this);
-				obj.data = this.data();
-				return obj;
+				return Objs.extend({
+					data: this.data(),
+					status_code: this.status_code(),
+					status_text: this.status_text()
+				}, inherited.json.call(this));
 			}
-		
+			
 		};
 	});
 });
@@ -7334,85 +7441,65 @@ Scoped.define("module:Net.AjaxException", ["module:Exceptions.Exception"], funct
  * 
  */
 
-Scoped.define("module:Net.AbstractAjax", ["module:Class", "module:Objs", "module:Net.AjaxException", "module:Net.Uri"], function (Class, Objs, AjaxException, Uri, scoped) {
-	return Class.extend({scoped: scoped}, function (inherited) {
+Scoped.define("module:Net.AbstractAjax", [ "module:Class", "module:Objs", "module:Net.Uri" ], function(Class, Objs, Uri, scoped) {
+	return Class.extend({ scoped : scoped }, function(inherited) {
 		return {
 
-			constructor: function (options) {
+			constructor : function(options) {
 				inherited.constructor.call(this);
 				this.__options = Objs.extend({
-					"method": "GET",
-					"data": {}
+					"method" : "GET",
+					"data" : {}
 				}, options);
 			},
-			
-			syncCall: function (options) {
-				try {
-          if (this._shouldMap(options)) {
-            options = this._mapPutToPost(options);
-          }
 
-					return this._syncCall(Objs.extend(Objs.clone(this.__options, 1), options));
-				} catch (e) {
-					throw AjaxException.ensure(e);
-				}
-			},
-			
-			asyncCall: function (options) {
-
-        if (this._shouldMap(options)) {
-          options = this._mapPutToPost(options);
-        }
-
-				return this._asyncCall(Objs.extend(Objs.clone(this.__options, 1), options));
-			},
-			
-			_syncCall: function (options) {
-				throw "Unsupported";
-			},
-		
-			_asyncCall: function (options) {
-				throw "Unsupported";
+			asyncCall : function(options) {
+				if (this._shouldMap(options))
+					options = this._mapPutToPost(options);
+				return this._asyncCall(Objs.extend(Objs
+						.clone(this.__options, 1), options));
 			},
 
-      /**
-       * @method _shouldMap
-       *
-       * Check if should even attempt a mapping. Important to not assume
-       * that the method option is always specified.
-       *
-       * @return Boolean
-       */
-      _shouldMap: function (options) {
-        return this.__options.mapPutToPost &&
-          options.method && options.method.toLowerCase() === "put";
+			_asyncCall : function(options) {
+				throw "Abstract";
+			},
 
-      },
+			/**
+			 * @method _shouldMap
+			 * 
+			 * Check if should even attempt a mapping. Important to not assume
+			 * that the method option is always specified.
+			 * 
+			 * @return Boolean
+			 */
+			_shouldMap : function(options) {
+				return this.__options.mapPutToPost && options.method && options.method.toLowerCase() === "put";
+			},
 
-      /**
-       * @method _mapPutToPost
-       *
-       * Some implementations of PUT to not supporting sending data with the PUT
-       * request. This fix converts the Request to use POST, so the data is
-       * sent, but the server still thinks it is receiving a PUT request.
-       *
-       * @param {object} options
-       *
-       * @return {object}
-       */
-      _mapPutToPost: function(options) {
-        options.method = "POST";
-        options.uri = Uri.appendUriParams(
-          options.uri, {
-          _method: "PUT"
-        });
+			/**
+			 * @method _mapPutToPost
+			 * 
+			 * Some implementations of PUT to not supporting sending data with
+			 * the PUT request. This fix converts the Request to use POST, so
+			 * the data is sent, but the server still thinks it is receiving a
+			 * PUT request.
+			 * 
+			 * @param {object}
+			 *            options
+			 * 
+			 * @return {object}
+			 */
+			_mapPutToPost : function(options) {
+				options.method = "POST";
+				options.uri = Uri.appendUriParams(options.uri, {
+					_method : "PUT"
+				});
 
-        return options;
-      }
+				return options;
+			}
 		};
 	});
 });
-
 
 Scoped.define("module:Net.SocketSenderChannel", ["module:Channels.Sender", "module:Types"], function (Sender, Types, scoped) {
 	return Sender.extend({scoped: scoped}, function (inherited) {

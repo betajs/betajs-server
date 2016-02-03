@@ -1,7 +1,7 @@
 /*!
-betajs-data - v1.0.11 - 2015-12-16
+betajs-data - v1.0.15 - 2016-01-18
 Copyright (c) Oliver Friedmann
-MIT Software License.
+Apache 2.0 Software License.
 */
 (function () {
 
@@ -14,7 +14,7 @@ Scoped.binding("json", "global:JSON");
 Scoped.define("module:", function () {
 	return {
 		guid: "70ed7146-bb6d-4da4-97dc-5a8e2d23a23f",
-		version: '57.1450308943993'
+		version: '62.1453156645654'
 	};
 });
 
@@ -317,7 +317,7 @@ Scoped.define("module:Queries", [
 		},
 
 		is_query_atom: function (value) {
-			return value === null || !Types.is_object(value) || Objs.all(value, function (v, key) {
+			return value === null || !Types.is_object(value) || value.toString() !== "[object Object]" || Objs.all(value, function (v, key) {
 				return !(key in this.SYNTAX_CONDITION_KEYS);
 			}, this);
 		},
@@ -650,7 +650,7 @@ Scoped.define("module:Queries", [
 			Objs.iter(value, function (condition_value, condition_key) {
 				result[condition_key] = this.mapKeyValueCondition(condition_value, key, callback, context);
 			}, this);
-			return Obj.objectBy(key, result);
+			return Objs.objectBy(key, result);
 		},
 
 		mapKeyValueCondition: function (condition_value, key, callback, context) {
@@ -661,8 +661,22 @@ Scoped.define("module:Queries", [
 				return Objs.peek(callback.call(context, key, value));
 			}, this);
 			return is_array ? result : result[0];
+		},
+
+		queryDeterminedByAttrs: function (query, attributes) {
+			return Objs.exists(query, function (value, key) {
+				if (key === "$and") {
+					return Objs.exists(value, function (q) {
+						return this.queryDeterminedByAttrs(q, attributes);
+					}, this);
+				} else if (key === "$or") {
+					return Objs.all(value, function (q) {
+						return this.queryDeterminedByAttrs(q, attributes);
+					}, this);
+				} else
+					return attributes[key];
+			}, this);
 		}
-		
 		
 	}; 
 });
@@ -1044,12 +1058,13 @@ Scoped.define("module:Stores.MemoryStore", [
 });
 
 Scoped.define("module:Stores.BaseStore", [
-                                          "base:Class",
-                                          "base:Events.EventsMixin",
-                                          "module:Stores.ReadStoreMixin",
-                                          "module:Stores.WriteStoreMixin",
-                                          "base:Promise"
-                                          ], function (Class, EventsMixin, ReadStoreMixin, WriteStoreMixin, Promise, scoped) {
+  "base:Class",
+  "base:Events.EventsMixin",
+  "module:Stores.ReadStoreMixin",
+  "module:Stores.WriteStoreMixin",
+  "base:Promise",
+  "base:Objs"
+], function (Class, EventsMixin, ReadStoreMixin, WriteStoreMixin, Promise, Objs, scoped) {
 	return Class.extend({scoped: scoped}, [EventsMixin, ReadStoreMixin, WriteStoreMixin, function (inherited) {			
 		return {
 
@@ -1064,6 +1079,14 @@ Scoped.define("module:Stores.BaseStore", [
 
 			ensure_index: function (key) {
 				return this._ensure_index(key);
+			},
+
+			getBy: function (key, value, ctx) {
+				if (key === this.id_key())
+					return this.get(value, ctx);
+				return this.query(Objs.objectBy(key, value), {limit: 1}).mapSuccess(function (iter) {
+					return iter.next();
+				});
 			},
 
 			clear: function (ctx) {
@@ -1187,8 +1210,8 @@ Scoped.define("module:Stores.StoreHistory", [
 					combine_insert_remove: false,
 					combine_update_remove: false,
 					source_id_key: sourceStore ? sourceStore.id_key() : "id",
-							row_data: {},
-							filter_data: {}
+					row_data: {},
+					filter_data: {}
 				}, options);
 				this.historyStore = historyStore || new MemoryStore();
 				this.commitId = 1;
@@ -1243,7 +1266,7 @@ Scoped.define("module:Stores.StoreHistory", [
 				}, this._options.row_data));
 			},
 
-			sourceRemove: function (id) {
+			sourceRemove: function (id, data) {
 				this.commitId++;
 				if (this._options.combine_insert_remove) {
 					if (this.historyStore.query(Objs.extend({
@@ -1269,6 +1292,7 @@ Scoped.define("module:Stores.StoreHistory", [
 				this.historyStore.insert(Objs.extend({
 					type: "remove",
 					row_id: id,
+					row: data,
 					commit_id: this.commitId
 				}, this._options.row_data));
 			}
@@ -1987,6 +2011,10 @@ Scoped.define("module:Stores.TransformationStore", [
 				return data;
 			},
 			
+			_encodeSort: function (sort) {
+				return this._encodeData(sort);
+			},
+			
 			_encodeId: function (id) {
 				return this.id_of(this._encodeData(Objs.objectBy(this.id_key(), id)));
 			},
@@ -1998,7 +2026,7 @@ Scoped.define("module:Stores.TransformationStore", [
 			_encodeQuery: function (query, options) {
 				var opts = Objs.clone(options);
 				if (opts.sort)
-					opts.sort = Types.is_object(opts.sort) ? this._encodeData(opts.sort) : {};
+					opts.sort = Types.is_object(opts.sort) ? this._encodeSort(opts.sort) : {};
 				return {
 					query: Queries.mapKeyValue(query, function (key, value) {
 						return this._encodeData(Objs.objectBy(key, value)); 
@@ -2349,13 +2377,20 @@ Scoped.define("module:Stores.Invokers.RouteredRestInvokee", [], function () {
 
 
 
-Scoped.define("module:Stores.Invokers.InvokerStore", ["module:Stores.BaseStore"], function (BaseStore, scoped) {
+Scoped.define("module:Stores.Invokers.InvokerStore", [
+    "module:Stores.BaseStore",
+    "module:Queries.Constrained"
+], function (BaseStore, Constrained, scoped) {
 	return BaseStore.extend({scoped: scoped}, function (inherited) {			
 		return {
 			
 			constructor: function (storeInvokee, options) {
 				inherited.constructor.call(this, options);
 				this.__storeInvokee = storeInvokee;
+			},
+			
+			_query_capabilities: function () {
+				return Constrained.fullConstrainedQueryCapabilities();
 			},
 			
 			__invoke: function (member, data, context) {
@@ -2464,6 +2499,8 @@ Scoped.define("module:Stores.Invokers.StoreInvokeeRestInvoker", [
 							if (data.query && !Types.is_empty(data.query))
 								result.query = JSON.stringify(data.query);
 							result = Objs.extend(result, data.options);
+							if (result.sort)
+								result.sort = JSON.stringify(result.sort);
 							return result;
 						}
 					},
@@ -2557,12 +2594,18 @@ Scoped.define("module:Stores.Invokers.RouteredRestInvokeeStoreInvoker", [
 						},
 						"query": function (member, uriData, post, get, ctx) {
 							var result = {};
-							if (get.query)
-								result.query = JSON.parse(get.query);
+							try {
+								if (get.query)
+									result.query = JSON.parse(get.query);
+							} catch (e) {}
 							var opts = Objs.clone(get, 1);
 							delete opts.query;
 							if (!Types.is_empty(opts))
 								result.options = opts;
+							try {
+								if (result.options.sort)
+									result.options.sort = JSON.parse(result.options.sort);
+							} catch (e) {}
 							return result;
 						}
 					},
@@ -2655,34 +2698,46 @@ Scoped.define("module:Stores.Invokers.RestInvokeeStoreInvoker", [
 	}]);
 });
 
+/*
+ * Very important to know:
+ *  - If both itemCache + remoteStore use the same id_key, the keys actually coincide.
+ *  - If they use different keys, the cache stores the remoteStore keys as a foreign key and assigns its own keys to the cached items
+ *
+ */
 
 Scoped.define("module:Stores.CachedStore", [
-                                            "module:Stores.BaseStore",
-                                            "module:Stores.MemoryStore",
-                                            "module:Queries.Constrained",
-                                            "module:Stores.CacheStrategies.ExpiryCacheStrategy",
-                                            "base:Promise",
-                                            "base:Objs",
-                                            "base:Types",
-                                            "base:Iterators.ArrayIterator",
-                                            "base:Iterators.MappedIterator",
-                                            "base:Timers.Timer"
-                                            ], function (Store, MemoryStore, Constrained, ExpiryCacheStrategy, Promise, Objs, Types, ArrayIterator, MappedIterator, Timer, scoped) {
-	return Store.extend({scoped: scoped}, function (inherited) {			
+	"module:Stores.BaseStore",
+	"module:Stores.MemoryStore",
+	"module:Queries",
+	"module:Queries.Constrained",
+	"module:Stores.CacheStrategies.ExpiryCacheStrategy",
+	"base:Promise",
+	"base:Objs",
+	"base:Types",
+	"base:Iterators.ArrayIterator",
+	"base:Iterators.MappedIterator",
+	"base:Timers.Timer"
+], function (Store, MemoryStore, Queries, Constrained, ExpiryCacheStrategy, Promise, Objs, Types, ArrayIterator, MappedIterator, Timer, scoped) {
+	return Store.extend({scoped: scoped}, function (inherited) {
 		return {
 
 			constructor: function (remoteStore, options) {
 				inherited.constructor.call(this);
+				this.remoteStore = remoteStore;
 				this._options = Objs.extend({
 					itemMetaKey: "meta",
 					queryMetaKey: "meta",
-					queryKey: "query"
+					queryKey: "query",
+					cacheKey: null,
+					suppAttrs: {}
 				}, options);
-				this.remoteStore = remoteStore;
 				this._online = true;
-				this.itemCache = this._options.itemCache || this.auto_destroy(new MemoryStore({					
-					id_key: remoteStore.id_key()
+				this.itemCache = this._options.itemCache || this.auto_destroy(new MemoryStore({
+					id_key: this._options.cacheKey || this.remoteStore.id_key()
 				}));
+				this._options.cacheKey = this.itemCache.id_key();
+				this._id_key = this.itemCache.id_key();
+				this._foreignKey = this.itemCache.id_key() !== this.remoteStore.id_key();
 				this.queryCache = this._options.queryCache || this.auto_destroy(new MemoryStore());
 				this.cacheStrategy = this._options.cacheStrategy || this.auto_destroy(new ExpiryCacheStrategy());
 				if (this._options.auto_cleanup) {
@@ -2721,7 +2776,7 @@ Scoped.define("module:Stores.CachedStore", [
 			_remove: function (id) {
 				return this.cacheRemove(id, {
 					ignoreLock: true,
-					silent: true					
+					silent: true
 				});
 			},
 
@@ -2743,7 +2798,7 @@ Scoped.define("module:Stores.CachedStore", [
 					refreshMeta: true,
 					accessMeta: true
 				});
-			},			
+			},
 
 			/*
 			 * options:
@@ -2755,12 +2810,12 @@ Scoped.define("module:Stores.CachedStore", [
 
 			cacheInsert: function (data, options) {
 				var meta = {
-						lockedItem: options.lockItem,
-						lockedAttrs: {},
-						refreshMeta: options.refreshMeta ? this.cacheStrategy.itemRefreshMeta() : null,
-								accessMeta: options.accessMeta ? this.cacheStrategy.itemAccessMeta() : null
+					lockedItem: options.lockItem,
+					lockedAttrs: {},
+					refreshMeta: options.refreshMeta ? this.cacheStrategy.itemRefreshMeta() : null,
+					accessMeta: options.accessMeta ? this.cacheStrategy.itemAccessMeta() : null
 				};
-				return this.itemCache.insert(this.addItemMeta(data, meta)).mapSuccess(function (result) {
+				return this.itemCache.insert(this.addItemSupp(this.addItemMeta(data, meta))).mapSuccess(function (result) {
 					data = this.removeItemMeta(result);
 					if (!options.silent)
 						this._inserted(data);
@@ -2775,13 +2830,23 @@ Scoped.define("module:Stores.CachedStore", [
 			 *   - silent: boolean
 			 *   - accessMeta: boolean
 			 *   - refreshMeta: boolean
+			 *   - foreignKey: boolean (default false)
+			 *   - unlockItem: boolean (default false)
 			 */
 
 			cacheUpdate: function (id, data, options) {
-				return this.itemCache.get(id).mapSuccess(function (item) {
+				var foreignKey = options.foreignKey && this._foreignKey;
+				var itemPromise = foreignKey ?
+					              this.itemCache.getBy(this.remoteStore.id_key(), id)
+					            : this.itemCache.get(id);
+				return itemPromise.mapSuccess(function (item) {
 					if (!item)
 						return null;
 					var meta = this.readItemMeta(item);
+					if (options.unlockItem) {
+						meta.lockedItem = false;
+						meta.lockedAttrs = {};
+					}
 					data = Objs.filter(data, function (value, key) {
 						return options.ignoreLock || (!meta.lockedItem && !meta.lockedAttrs[key]);
 					}, this);
@@ -2796,19 +2861,23 @@ Scoped.define("module:Stores.CachedStore", [
 						meta.refreshMeta = this.cacheStrategy.itemRefreshMeta(meta.refreshMeta);
 					if (options.accessMeta)
 						meta.accessMeta = this.cacheStrategy.itemAccessMeta(meta.accessMeta);
-					return this.itemCache.update(id, this.addItemMeta(data, meta)).mapSuccess(function (result) {
+					return this.itemCache.update(this.itemCache.id_of(item), this.addItemMeta(data, meta)).mapSuccess(function (result) {
 						result = this.removeItemMeta(result);
 						if (!options.silent)
 							this._updated(result, data);
 						return result;
-					}, this);					
+					}, this);
 				}, this);
 			},
 
 			cacheInsertUpdate: function (data, options) {
-				var id = data[this.remoteStore.id_key()];
-				return this.itemCache.get(id).mapSuccess(function (item) {
-					return item ? this.cacheUpdate(id, data, options) : this.cacheInsert(data, options);
+				var foreignKey = options.foreignKey && this._foreignKey;
+				var itemPromise = foreignKey ?
+					              this.itemCache.getBy(this.remoteStore.id_key(), this.remoteStore.id_of(data))
+					            : this.itemCache.get(this.itemCache.id_of(data));
+				return itemPromise.mapSuccess(function (item) {
+					options.foreignKey = false;
+					return item ? this.cacheUpdate(this.itemCache.id_of(item), data, options) : this.cacheInsert(data, options);
 				}, this);
 			},
 
@@ -2816,17 +2885,23 @@ Scoped.define("module:Stores.CachedStore", [
 			 * options:
 			 *   - ignoreLock: boolean
 			 *   - silent: boolean
+			 *   - foreignKey: boolean
 			 */
 			cacheRemove: function (id, options) {
-				return this.itemCache.get(id).mapSuccess(function (data) {
+				var foreignKey = options.foreignKey && this._foreignKey;
+				var itemPromise = foreignKey ?
+					  this.itemCache.getBy(this.remoteStore.id_key(), id)
+					: this.itemCache.get(id);
+				return itemPromise.mapSuccess(function (data) {
 					if (!data)
 						return data;
 					var meta = this.readItemMeta(data);
 					if (!options.ignoreLock && (meta.lockedItem || !Types.is_empty(meta.lockedAttrs)))
 						return Promise.error("locked item");
-					return this.itemCache.remove(id).success(function () {
+					var cached_id = this.itemCache.id_of(data);
+					return this.itemCache.remove(cached_id).success(function () {
 						if (!options.silent)
-							this._removed(id);
+							this._removed(cached_id);
 					}, this);
 				}, this);
 			},
@@ -2838,34 +2913,44 @@ Scoped.define("module:Stores.CachedStore", [
 			 *   - silentRemove: boolean
 			 *   - refreshMeta: boolean
 			 *   - accessMeta: boolean
+			 *   - foreignKey: boolean
 			 */
 			cacheGet: function (id, options) {
-				return this.itemCache.get(id).mapSuccess(function (data) {
+				var foreignKey = options.foreignKey && this._foreignKey;
+				var itemPromise = foreignKey ?
+					  this.itemCache.getBy(this.remoteStore.id_key(), id)
+					: this.itemCache.get(id);
+				return itemPromise.mapSuccess(function (data) {
 					if (!data) {
-						return this.remoteStore.get(id).success(function (data) {
+						if (!foreignKey && this._foreignKey)
+							return data;
+						return this.remoteStore.get(id).mapSuccess(function (data) {
 							this.online();
 							if (data) {
-								this.cacheInsert(data, {
+								return this.cacheInsert(data, {
 									lockItem: false,
 									silent: options.silentInsert,
 									accessMeta: true,
 									refreshMeta: true
 								});
-							}
+							} else
+								return data;
 						}, this);
 					}
 					var meta = this.readItemMeta(data);
+					var cached_id = this.itemCache.id_of(data);
+					var remote_id = this.remoteStore.id_of(data);
 					if (this.cacheStrategy.validItemRefreshMeta(meta.refreshMeta) || meta.lockedItem) {
 						if (options.accessMeta) {
 							meta.accessMeta = this.cacheStrategy.itemAccessMeta(meta.accessMeta);
-							this.itemCache.update(id, this.addItemMeta({}, meta));
+							this.itemCache.update(cached_id, this.addItemMeta({}, meta));
 						}
 						return this.removeItemMeta(data);
 					}
-					return this.remoteStore.get(id).success(function (data) {
+					return this.remoteStore.get(remote_id).mapSuccess(function (data) {
 						this.online();
 						if (data) {
-							this.cacheUpdate(id, data, {
+							return this.cacheUpdate(cached_id, data, {
 								ignoreLock: false,
 								lockAttrs: false,
 								silent: options.silentUpdate,
@@ -2873,7 +2958,7 @@ Scoped.define("module:Stores.CachedStore", [
 								refreshMeta: true
 							});
 						} else {
-							this.cacheRemove(id, {
+							return this.cacheRemove(cached_id, {
 								ignoreLock: false,
 								silent: options.silentRemove
 							});
@@ -2899,8 +2984,8 @@ Scoped.define("module:Stores.CachedStore", [
 					options: queryOptions
 				});
 				var localQuery = Objs.objectBy(
-						this._options.queryKey,
-						queryString
+					this._options.queryKey,
+					queryString
 				);
 				return this.queryCache.query(localQuery, {limit : 1}).mapSuccess(function (result) {
 					result = result.hasNext() ? result.next() : null;
@@ -2928,16 +3013,19 @@ Scoped.define("module:Stores.CachedStore", [
 						}
 						this.queryCache.remove(query_id);
 					}
+					// Note: This is probably not good enough in the most general cases.
+					if (Queries.queryDeterminedByAttrs(query, this._options.suppAttrs))
+						return this.itemCache.query(query, options);
 					return this.remoteStore.query(query, queryOptions).mapSuccess(function (items) {
 						this.online();
 						items = items.asArray();
 						var meta = {
-								refreshMeta: options.queryRefreshMeta ? this.cacheStrategy.queryRefreshMeta() : null,
-										accessMeta: options.queryAccessMeta ? this.cacheStrategy.queryAccessMeta() : null
+							refreshMeta: options.queryRefreshMeta ? this.cacheStrategy.queryRefreshMeta() : null,
+							accessMeta: options.queryAccessMeta ? this.cacheStrategy.queryAccessMeta() : null
 						};
 						this.queryCache.insert(Objs.objectBy(
-								this._options.queryKey, queryString,
-								this._options.queryMetaKey, meta
+							this._options.queryKey, queryString,
+							this._options.queryMetaKey, meta
 						));
 						Objs.iter(items, function (item) {
 							this.cacheInsertUpdate(item, {
@@ -2945,10 +3033,11 @@ Scoped.define("module:Stores.CachedStore", [
 								lockAttrs: false,
 								silent: options.silent,
 								accessMeta: options.accessMeta,
-								refreshMeta: options.refreshMeta
+								refreshMeta: options.refreshMeta,
+								foreignKey: true
 							});
 						}, this);
-						return new ArrayIterator(items);
+						return new MappedIterator(new ArrayIterator(items), this.addItemSupp, this);
 					}, this).mapError(function () {
 						this.offline();
 						return this.itemCache.query(query, options).mapSuccess(function (items) {
@@ -2967,12 +3056,12 @@ Scoped.define("module:Stores.CachedStore", [
 					}, this);
 				}, this);
 			},
-			
+
 			online: function () {
 				this.trigger("online");
 				this._online = true;
 			},
-			
+
 			offline: function () {
 				this.trigger("offline");
 				this._online = false;
@@ -2982,6 +3071,10 @@ Scoped.define("module:Stores.CachedStore", [
 				data = Objs.clone(data, 1);
 				data[this._options.itemMetaKey] = meta;
 				return data;
+			},
+
+			addItemSupp: function (data) {
+				return Objs.extend(Objs.clone(this._options.suppAttrs, 1), data);
 			},
 
 			addQueryMeta: function (data, meta) {
@@ -3012,7 +3105,7 @@ Scoped.define("module:Stores.CachedStore", [
 
 			unlockItem: function (id) {
 				this.itemCache.get(id).success(function (data) {
-					if (!data) 
+					if (!data)
 						return;
 					var meta = this.readItemMeta(data);
 					meta.lockedItem = false;
@@ -3037,9 +3130,17 @@ Scoped.define("module:Stores.CachedStore", [
 						var item = items.next();
 						var meta = this.readItemMeta(item);
 						if (!meta.lockedItem && Types.is_empty(meta.lockedAttrs) &&
-								(!this.cacheStrategy.validItemRefreshMeta(meta.refreshMeta) || !this.cacheStrategy.validItemAccessMeta(meta.accessMeta)))
+							(!this.cacheStrategy.validItemRefreshMeta(meta.refreshMeta) || !this.cacheStrategy.validItemAccessMeta(meta.accessMeta)))
 							this.itemCache.remove(this.itemCache.id_of(item));
 					}
+				}, this);
+			},
+
+			cachedIdToRemoteId: function (cachedId) {
+				if (!this._foreignKey)
+					return Promise.value(cachedId);
+				return this.itemCache.get(cachedId).mapSuccess(function (item) {
+					return item ? this.remoteStore.id_of(item) : null;
 				}, this);
 			}
 
@@ -3097,35 +3198,47 @@ Scoped.define("module:Stores.CacheStrategies.ExpiryCacheStrategy", [
 			},
 
 			itemRefreshMeta: function (refreshMeta) {
-				return refreshMeta ? refreshMeta : this._options.now() + this._options.itemRefreshTime; 
+				if (refreshMeta)
+					return refreshMeta;
+				if (this._options.itemRefreshTime === null)
+					return null;
+				return this._options.now() + this._options.itemRefreshTime;
 			},
 
 			queryRefreshMeta: function (refreshMeta) {
-				return refreshMeta ? refreshMeta : this._options.now() + this._options.queryRefreshTime; 
+				if (refreshMeta)
+					return refreshMeta;
+				if (this._options.queryRefreshTime === null)
+					return null;
+				return this._options.now() + this._options.queryRefreshTime;
 			},
 
 			itemAccessMeta: function (accessMeta) {
-				return this._options.now() + this._options.itemAccessTime; 
+				if (this._options.itemAccessTime === null)
+					return null;
+				return this._options.now() + this._options.itemAccessTime;
 			},
 
 			queryAccessMeta: function (accessMeta) {
-				return this._options.now() + this._options.queryAccessTime; 
+				if (this._options.queryAccessTime === null)
+					return null;
+				return this._options.now() + this._options.queryAccessTime;
 			},
 
 			validItemRefreshMeta: function (refreshMeta) {
-				return refreshMeta >= this._options.now();
+				return this._options.itemRefreshTime === null || refreshMeta >= this._options.now();
 			},
 
 			validQueryRefreshMeta: function (refreshMeta) {
-				return refreshMeta >= this._options.now();
+				return this._options.queryRefreshTime === null || refreshMeta >= this._options.now();
 			},	
 
 			validItemAccessMeta: function (accessMeta) {
-				return accessMeta >= this._options.now();
+				return this._options.itemAccessTime === null || accessMeta >= this._options.now();
 			},
 
 			validQueryAccessMeta: function (accessMeta) {
-				return accessMeta >= this._options.now();
+				return this._options.queryAccessTime === null || accessMeta >= this._options.now();
 			}
 
 		};
@@ -3257,25 +3370,29 @@ Scoped.define("module:Stores.PartialStoreWriteStrategies.PostWriteStrategy", [
 				}, this);
 			},
 
-			remove: function (id) {
-				return this.partialStore.remoteStore.remove(id).mapSuccess(function () {
-					return this.partialStore.cachedStore.cacheRemove(id, {
-						ignoreLock: true,
-						silent: true
+			remove: function (cachedId) {
+				return this.partialStore.cachedStore.cachedIdToRemoteId(cachedId).mapSuccess(function (remoteId) {
+					return this.partialStore.remoteStore.remove(remoteId).mapSuccess(function () {
+						return this.partialStore.cachedStore.cacheRemove(cachedId, {
+							ignoreLock: true,
+							silent: true
+						}, this);
 					}, this);
 				}, this);
 			},
 
-			update: function (id, data) {
-				return this.partialStore.remoteStore.update(id, data).mapSuccess(function () {
-					return this.partialStore.cachedStore.cacheUpdate(id, data, {
-						ignoreLock: false,
-						lockAttrs: false,
-						silent: true,
-						refreshMeta: true,
-						accessMeta: true
+			update: function (cachedId, data) {
+				return this.partialStore.cachedStore.cachedIdToRemoteId(cachedId).mapSuccess(function (remoteId) {
+					return this.partialStore.remoteStore.update(remoteId, data).mapSuccess(function () {
+						return this.partialStore.cachedStore.cacheUpdate(cachedId, data, {
+							ignoreLock: false,
+							lockAttrs: false,
+							silent: true,
+							refreshMeta: true,
+							accessMeta: true
+						}, this);
 					}, this);
-				}, this);
+				});
 			}
 
 		};
@@ -3296,8 +3413,11 @@ Scoped.define("module:Stores.PartialStoreWriteStrategies.PreWriteStrategy", [
 					refreshMeta: true,
 					accessMeta: true
 				}).success(function (data) {
-					this.partialStore.remoteStore.insert(data).success(function () {
-						this.partialStore.cachedStore.unlockItem(this.partialStore.cachedStore.id_of(data));
+					this.partialStore.remoteStore.insert(data).success(function (remoteData) {
+						this.partialStore.cachedStore.cacheUpdate(this.partialStore.cachedStore.id_of(data), remoteData, {
+							silent: true,
+							unlockItem: true
+						});
 					}, this).error(function () {
 						this.partialStore.cachedStore.cacheRemove(this.partialStore.cachedStore.id_of(data), {
 							ignoreLock: true,
@@ -3307,25 +3427,29 @@ Scoped.define("module:Stores.PartialStoreWriteStrategies.PreWriteStrategy", [
 				}, this);
 			},
 
-			remove: function (id) {
-				return this.partialStore.cachedStore.cacheRemove(id, {
-					ignoreLock: true,
-					silent: true
-				}).success(function () {
-					this.partialStore.remoteStore.remove(id);
+			remove: function (cachedId) {
+				return this.partialStore.cachedStore.cachedIdToRemoteId(cachedId).mapSuccess(function (remoteId) {
+					return this.partialStore.cachedStore.cacheRemove(cachedId, {
+						ignoreLock: true,
+						silent: true
+					}).success(function () {
+						this.partialStore.remoteStore.remove(remoteId);
+					}, this);
 				}, this);
 			},
 
-			update: function (id, data) {
-				return this.partialStore.cachedStore.cacheUpdate(id, data, {
-					lockAttrs: true,
-					ignoreLock: false,
-					silent: true,
-					refreshMeta: false,
-					accessMeta: true
-				}).success(function (data) {
-					this.partialStore.remoteStore.update(id, data).success(function () {
-						this.partialStore.cachedStore.unlockItem(this.partialStore.cachedStore.id_of(data));
+			update: function (cachedId, data) {
+				return this.partialStore.cachedStore.cachedIdToRemoteId(cachedId).mapSuccess(function (remoteId) {
+					return this.partialStore.cachedStore.cacheUpdate(cachedId, data, {
+						lockAttrs: true,
+						ignoreLock: false,
+						silent: true,
+						refreshMeta: false,
+						accessMeta: true
+					}).success(function (data) {
+						this.partialStore.remoteStore.update(remoteId, data).success(function () {
+							this.partialStore.cachedStore.unlockItem(cachedId);
+						}, this);
 					}, this);
 				}, this);
 			}
@@ -3349,8 +3473,12 @@ Scoped.define("module:Stores.PartialStoreWriteStrategies.CommitStrategy", [
 				inherited.constructor.call(this);
 				this._options = options || {};
 				this.historyStore = this._options.historyStore || this.auto_destroy(new MemoryStore());
+			},
+			
+			init: function (partialStore) {
+				inherited.init.call(this, partialStore);
 				this.storeHistory = this.auto_destroy(new StoreHistory(null, this.historyStore, {
-					source_id_key: this._options.source_id_key || "id",
+					source_id_key: partialStore.cachedStore.itemCache.id_key(),
 					row_data: {
 						pushed: false,
 						success: false
@@ -3359,10 +3487,6 @@ Scoped.define("module:Stores.PartialStoreWriteStrategies.CommitStrategy", [
 						pushed: false
 					}
 				}));
-			},
-			
-			init: function (partialStore) {
-				inherited.init.call(this, partialStore);
 				if (this._options.auto_push) {
 					this.auto_destroy(new Timer({
 						fire: function () {
@@ -3387,11 +3511,13 @@ Scoped.define("module:Stores.PartialStoreWriteStrategies.CommitStrategy", [
 			},
 
 			remove: function (id) {
-				return this.partialStore.cachedStore.cacheRemove(id, {
-					ignoreLock: true,
-					silent: true
-				}).success(function () {
-					this.storeHistory.sourceRemove(id);
+				return this.partialStore.cachedStore.cachedIdToRemoteId(id).mapSuccess(function (remoteId) {
+					return this.partialStore.cachedStore.cacheRemove(id, {
+						ignoreLock: true,
+						silent: true
+					}).success(function () {
+						this.storeHistory.sourceRemove(id, this.partialStore.remoteStore.id_row(remoteId));
+					}, this);
 				}, this);
 			},
 
@@ -3418,8 +3544,16 @@ Scoped.define("module:Stores.PartialStoreWriteStrategies.CommitStrategy", [
 					if (!iter.hasNext()) {
 						this.pushing = false;
 						Objs.iter(unlockIds, function (value, id) {
-							if (value) 
-								this.partialStore.cachedStore.unlockItem(id);
+							if (value) {
+								if (value === true) {
+									this.partialStore.cachedStore.unlockItem(id);
+								} else {
+									this.partialStore.cachedStore.cacheUpdate(id, value, {
+										unlockItem: true,
+										silent: true
+									});
+								}
+							}
 						}, this);
 						return;
 					}
@@ -3433,19 +3567,26 @@ Scoped.define("module:Stores.PartialStoreWriteStrategies.CommitStrategy", [
 						next.apply(this);
 					} else {
 						var promise = null;
-						if (commit.type === "insert")
+						if (commit.type === "insert") {
 							promise = this.partialStore.remoteStore.insert(commit.row);
-						else if (commit.type === "update")
-							promise = this.partialStore.remoteStore.update(commit.row_id, commit.row);
-						else if (commit.type === "remove")
-							promise = this.partialStore.remoteStore.remove(commit.row_id);
-						promise.success(function () {
+						} else if (commit.type === "update") {
+							promise = this.partialStore.cachedStore.cachedIdToRemoteId(commit.row_id).mapSuccess(function (remoteId) {
+								return this.partialStore.remoteStore.update(remoteId, commit.row);
+							}, this);
+						} else if (commit.type === "remove") {
+							return this.partialStore.remoteStore.remove(commit.row ? this.partialStore.remoteStore.id_of(commit.row) : commit.row_id);
+						}
+						promise.success(function (ret) {
 							hs.update(commit_id, {
 								pushed: true,
 								success: true
 							});
-							if (!(commit.row_id in unlockIds))
+							if (!(commit.row_id in unlockIds)) {
 								unlockIds[commit.row_id] = true;
+								if (commit.type === "insert") {
+									unlockIds[commit.row_id] = ret;
+								}
+							}
 							next.apply(this);
 						}, this).error(function () {
 							hs.update(commit_id, {
@@ -3649,12 +3790,12 @@ Scoped.define("module:Stores.Watchers.PollWatcher", [
 				options.id_key = store.id_key();
 				inherited.constructor.call(this, options);
 				this._store = store;
-				options = options || {};
 				this.__itemCache = {};
 				this.__lastKey = null;
 				this.__lastKeyIds = {};
 				this.__insertsCount = 0;
 				this.__increasingKey = options.increasing_key || this.id_key;
+				this.__ignoreUpdates = options.ignore_updates;
 				if (options.auto_poll) {
 					this.auto_destroy(new Timer({
 						fire: this.poll,
@@ -3702,21 +3843,25 @@ Scoped.define("module:Stores.Watchers.PollWatcher", [
 			},
 
 			poll: function () {
-				Objs.iter(this.__itemCache, function (value, id) {
-					this._store.get(id).success(function (data) {
-						if (!data) 
-							this._removedItem(id);
-						else {
-							this.__itemCache[id] = Objs.clone(data, 1);
-							if (value && !Comparators.deepEqual(value, data, -1))
-								this._updatedItem(data, data);
-						}
+				if (!this.__ignoreUpdates) {
+					Objs.iter(this.__itemCache, function (value, id) {
+						this._store.get(id).success(function (data) {
+							if (!data) 
+								this._removedItem(id);
+							else {
+								this.__itemCache[id] = Objs.clone(data, 1);
+								if (value && !Comparators.deepEqual(value, data, -1))
+									this._updatedItem(data, data);
+							}
+						}, this);
 					}, this);
-				}, this);
+				}
 				if (this.__lastKey) {
-					this.insertsIterator().iterate(function (query) {
+					this.insertsIterator().iterate(function (q) {
+						var query = q.query;
+						var options = q.options;
 						var keyQuery = Objs.objectBy(this.__increasingKey, {"$gte": this.__lastKey});
-						this._store.query({"$and": [keyQuery, query]}).success(function (result) {
+						this._store.query({"$and": [keyQuery, query]}, options).success(function (result) {
 							while (result.hasNext()) {
 								var item = result.next();
 								var id = this._store.id_of(item);
@@ -3854,7 +3999,7 @@ Scoped.define("module:Stores.Watchers.StoreWatcher", [
 				var trig = false;
 				var iter = this.__inserts.iterator();
 				while (!trig && iter.hasNext())
-					trig = Queries.evaluate(iter.next(), data);
+					trig = Queries.evaluate(iter.next().query, data);
 				if (!trig)
 					return;
 				this._insertedWatchedInsert(data);
@@ -4169,15 +4314,14 @@ Scoped.define("module:Collections.AbstractQueryCollection", [
 						sort: null
 					}
 				};
-				query = query || {};
-				this.update(query.query ? query : {
-					query: query,
+				this.update(Objs.tree_extend({
+					query: {},
 					options: {
 						skip: options.skip || 0,
 						limit: options.limit || options.range || null,
 						sort: options.sort || null
 					}
-				});
+				}, query ? (query.query || query.options ? query : {query: query}) : {}));
 				if (options.auto)
 					this.enable();
 			},
@@ -4355,13 +4499,14 @@ Scoped.define("module:Collections.AbstractQueryCollection", [
 			refresh: function (clear) {
 				if (clear)
 					this.clear();
-				if (this._query.options.sort && !Types.is_empty(this._query.options.sort))
+				if (this._query.options.sort && !Types.is_empty(this._query.options.sort)) {
 					this.set_compare(Comparators.byObject(this._query.options.sort));
-				else
+				} else {
 					this.set_compare(null);
+				}
 				this._unwatchInsert();
 				if (this._active)
-					this._watchInsert(this._query.query);
+					this._watchInsert(this._query);
 				return this._execute(this._query);
 			},
 
