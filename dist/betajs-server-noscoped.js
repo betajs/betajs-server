@@ -1,26 +1,281 @@
 /*!
-betajs-server - v1.0.3 - 2015-12-20
+betajs-server - v1.0.6 - 2016-02-19
 Copyright (c) Oliver Friedmann
-MIT Software License.
+Apache 2.0 Software License.
 */
+
 (function () {
-
 var Scoped = this.subScope();
-
-Scoped.binding("module", "global:BetaJS.Server");
-Scoped.binding("base", "global:BetaJS");
-Scoped.binding("json", "global:JSON");
-Scoped.binding("data", "global:BetaJS.Data");
-
+Scoped.binding('module', 'global:BetaJS.Server');
+Scoped.binding('base', 'global:BetaJS');
+Scoped.binding('data', 'global:BetaJS.Data');
 Scoped.define("module:", function () {
 	return {
-		guid: "9955100d-6a88-451f-9a85-004523eb8589",
-		version: '25.1450643756771'
-	};
+    "guid": "9955100d-6a88-451f-9a85-004523eb8589",
+    "version": "28.1455904540769"
+};
+});
+Scoped.assumeVersion('base:version', 444);
+Scoped.assumeVersion('data:version', 56);
+Scoped.define("module:Databases.DatabaseTable", [      
+        "base:Class",
+        "base:Iterators.MappedIterator"
+    ], function (Class, MappedIterator, scoped) {
+    return Class.extend({scoped: scoped}, function (inherited) {
+    	return  {
+			
+			constructor: function (database, table_name) {
+				inherited.constructor.call(this);
+				this._database = database;
+				this._table_name = table_name;
+			},
+		
+			findOne: function (query, options) {
+				return this._findOne(this._encode(query), options).mapSuccess(function (result) {
+					return !result ? null : this._decode(result);
+				}, this);
+			},
+			
+			_findOne: function (query, options) {
+				options = options || {};
+				options.limit = 1;
+				return this._find(query, options).mapSuccess(function (result) {
+					return result.next();
+				});
+			},
+			
+			_encode: function (data) {
+				return data;	
+			},
+			
+			_decode: function (data) {
+				return data;
+			},
+		
+			_find: function (query, options) {
+			},
+		
+			find: function (query, options) {
+				return this._find(this._encode(query), options).mapSuccess(function (result) {
+					return new MappedIterator(result, this._decode, this);
+				}, this);
+			},
+			
+			findById: function (id) {
+				return this.findOne({id : id});
+			},
+			
+			_insertRow: function (row) {		
+			},
+			
+			_removeRow: function (query) {		
+			},
+			
+			_updateRow: function (query, row) {
+			},
+			
+			insertRow: function (row) {
+				return this._insertRow(this._encode(row)).mapSuccess(this._decode, this);
+			},
+			
+			removeRow: function (query) {
+				return this._removeRow(this._encode(query));
+			},
+			
+			updateRow: function (query, row) {
+				return this._updateRow(this._encode(query), this._encode(row)).mapSuccess(this._decode, this);
+			},
+			
+			removeById: function (id) {
+				return this.removeRow({id : id});
+			},
+			
+			updateById: function (id, data) {
+				return this.updateRow({id: id}, data);
+			},
+			
+			ensureIndex: function (key) {}
+			
+    	};
+    });
+});
+Scoped.define("module:Databases.Database", [      
+        "base:Class"
+    ], function (Class, scoped) {
+    return Class.extend({scoped: scoped}, {
+		
+		_tableClass: function () {
+			return null;
+		},
+		
+		getTable: function (table_name) {
+			var cls = this._tableClass();		
+			return new cls(this, table_name);
+		}
+
+    });
 });
 
-Scoped.assumeVersion("base:version", 444);
-Scoped.assumeVersion("data:version", 56);
+Scoped.define("module:Databases.MongoDatabase", [      
+        "module:Databases.Database",
+        "module:Databases.MongoDatabaseTable",
+        "base:Strings",
+        "base:Types",
+        "base:Objs",
+        "base:Promise",
+        "base:Net.Uri"
+    ], function (Database, MongoDatabaseTable, Strings, Types, Objs, Promise, Uri, scoped) {
+    return Database.extend({scoped: scoped}, function (inherited) {
+    	return  {
+		
+		    constructor : function(db) {
+		        if (Types.is_string(db)) {
+		            this.__dbUri = Strings.strip_start(db, "mongodb://");
+		            this.__dbObject = this.cls.uriToObject(db);
+		        } else {
+		            db = Objs.extend({
+		                database : "database",
+		                server : "localhost",
+		                port : 27017
+		            }, db);
+		            this.__dbObject = db;
+		            this.__dbUri = this.cls.objectToUri(db);
+		        }
+		        inherited.constructor.call(this);
+		        this.mongo_module = require("mongodb");
+		    },
+		
+		    _tableClass : function() {
+		        return MongoDatabaseTable;
+		    },
+		
+		    mongo_object_id : function(id) {
+		        return this.mongo_module.ObjectID;
+		    },
+		
+		    mongodb : function() {
+		    	if (this.__mongodb)
+		    		return Promise.value(this.__mongodb);
+		    	var promise = Promise.create();
+		        this.mongo_module.MongoClient.connect('mongodb://' + this.__dbUri, {
+		            server: {
+		                'auto_reconnect': true
+		            }
+		        }, promise.asyncCallbackFunc());
+		        return promise.success(function (db) {
+		        	this.__mongodb = db;
+		        }, this);
+		    }
+		};
+		
+    }, {
+	
+	    uriToObject : function(uri) {
+	        var parsed = Uri.parse(uri);
+	        return {
+	            database : Strings.strip_start(parsed.path, "/"),
+	            server : parsed.host,
+	            port : parsed.port,
+	            username : parsed.user,
+	            password : parsed.password
+	        };
+	    },
+	
+	    objectToUri : function(object) {
+	        object.path = object.database;
+	        return Uri.build(object);
+	    }
+	    
+	}); 
+});
+Scoped.define("module:Databases.MongoDatabaseTable", [      
+        "module:Databases.DatabaseTable",
+        "base:Promise",
+        "base:Objs",
+        "base:Iterators.ArrayIterator"
+    ], function (DatabaseTable, Promise, Objs, ArrayIterator, scoped) {
+    return DatabaseTable.extend({scoped: scoped}, {
+		
+		table: function () {
+			if (this.__table)
+				return Promise.create(this.__table);
+			return this._database.mongodb().mapSuccess(function (db) {
+				this.__table = db.collection(this._table_name);
+				return this.__table;
+			}, this);
+		},
+		
+		_encode: function (data) {
+			var obj = Objs.clone(data, 1);
+			if ("id" in data) {
+				delete obj.id;
+				if (data.id !== null) {
+		            var objid = this._database.mongo_object_id();
+		            obj._id = new objid(data.id + "");
+				}
+			}
+			return obj;
+		},
+		
+		_decode: function (data) {
+			var obj = Objs.clone(data, 1);
+			if ("_id" in data) {
+				delete obj._id;
+				obj.id = data._id;
+			}
+			return obj;
+		},
+	
+		_find: function (query, options) {
+			return this.table().mapSuccess(function (table) {
+				return Promise.funcCallback(table, table.find, query).mapSuccess(function (result) {
+					options = options || {};
+					if ("sort" in options)
+						result = result.sort(options.sort);
+					if ("skip" in options)
+						result = result.skip(options.skip);
+					if ("limit" in options)
+						result = result.limit(options.limit);
+					return Promise.funcCallback(result, result.toArray).mapSuccess(function (cols) {
+						return new ArrayIterator(cols);
+					}, this);
+				}, this);
+			}, this);
+		},
+	
+		_insertRow: function (row) {
+			return this.table().mapSuccess(function (table) {
+				return Promise.funcCallback(table, table.insert, row).mapSuccess(function (result) {
+					return row;
+				}, this);
+			}, this);
+		},
+		
+		_removeRow: function (query, callbacks) {
+			return this.table().mapSuccess(function (table) {
+				return Promise.funcCallback(table, table.remove, query); 
+			}, this);
+		},
+		
+		_updateRow: function (query, row, callbacks) {
+			return this.table().mapSuccess(function (table) {
+				return Promise.funcCallback(table, table.update, query, {"$set" : row}).mapSuccess(function () {
+					return row;
+				}); 
+			}, this);
+		},
+			
+		ensureIndex: function (key) {
+			var obj = {};
+			obj[key] = 1;
+			this.table().success(function (table) {
+				table.ensureIndex(Objs.objectBy(key, 1));
+			});
+		}	
+		
+    });
+});
+
 Scoped.define("module:Net.HttpAjax", [      
         "base:Net.AbstractAjax",
         "base:Promise",
@@ -826,265 +1081,6 @@ Scoped.define("module:Sessions.SocketsManagerHelper", [
    });
 });
 
-
-Scoped.define("module:Databases.DatabaseTable", [      
-        "base:Class",
-        "base:Iterators.MappedIterator"
-    ], function (Class, MappedIterator, scoped) {
-    return Class.extend({scoped: scoped}, function (inherited) {
-    	return  {
-			
-			constructor: function (database, table_name) {
-				inherited.constructor.call(this);
-				this._database = database;
-				this._table_name = table_name;
-			},
-		
-			findOne: function (query, options) {
-				return this._findOne(this._encode(query), options).mapSuccess(function (result) {
-					return !result ? null : this._decode(result);
-				}, this);
-			},
-			
-			_findOne: function (query, options) {
-				options = options || {};
-				options.limit = 1;
-				return this._find(query, options).mapSuccess(function (result) {
-					return result.next();
-				});
-			},
-			
-			_encode: function (data) {
-				return data;	
-			},
-			
-			_decode: function (data) {
-				return data;
-			},
-		
-			_find: function (query, options) {
-			},
-		
-			find: function (query, options) {
-				return this._find(this._encode(query), options).mapSuccess(function (result) {
-					return new MappedIterator(result, this._decode, this);
-				}, this);
-			},
-			
-			findById: function (id) {
-				return this.findOne({id : id});
-			},
-			
-			_insertRow: function (row) {		
-			},
-			
-			_removeRow: function (query) {		
-			},
-			
-			_updateRow: function (query, row) {
-			},
-			
-			insertRow: function (row) {
-				return this._insertRow(this._encode(row)).mapSuccess(this._decode, this);
-			},
-			
-			removeRow: function (query) {
-				return this._removeRow(this._encode(query));
-			},
-			
-			updateRow: function (query, row) {
-				return this._updateRow(this._encode(query), this._encode(row)).mapSuccess(this._decode, this);
-			},
-			
-			removeById: function (id) {
-				return this.removeRow({id : id});
-			},
-			
-			updateById: function (id, data) {
-				return this.updateRow({id: id}, data);
-			},
-			
-			ensureIndex: function (key) {}
-			
-    	};
-    });
-});
-Scoped.define("module:Databases.Database", [      
-        "base:Class"
-    ], function (Class, scoped) {
-    return Class.extend({scoped: scoped}, {
-		
-		_tableClass: function () {
-			return null;
-		},
-		
-		getTable: function (table_name) {
-			var cls = this._tableClass();		
-			return new cls(this, table_name);
-		}
-
-    });
-});
-
-Scoped.define("module:Databases.MongoDatabase", [      
-        "module:Databases.Database",
-        "module:Databases.MongoDatabaseTable",
-        "base:Strings",
-        "base:Types",
-        "base:Objs",
-        "base:Promise",
-        "base:Net.Uri"
-    ], function (Database, MongoDatabaseTable, Strings, Types, Objs, Promise, Uri, scoped) {
-    return Database.extend({scoped: scoped}, function (inherited) {
-    	return  {
-		
-		    constructor : function(db) {
-		        if (Types.is_string(db)) {
-		            this.__dbUri = Strings.strip_start(db, "mongodb://");
-		            this.__dbObject = this.cls.uriToObject(db);
-		        } else {
-		            db = Objs.extend({
-		                database : "database",
-		                server : "localhost",
-		                port : 27017
-		            }, db);
-		            this.__dbObject = db;
-		            this.__dbUri = this.cls.objectToUri(db);
-		        }
-		        inherited.constructor.call(this);
-		        this.mongo_module = require("mongodb");
-		    },
-		
-		    _tableClass : function() {
-		        return MongoDatabaseTable;
-		    },
-		
-		    mongo_object_id : function(id) {
-		        return this.mongo_module.ObjectID;
-		    },
-		
-		    mongodb : function() {
-		    	if (this.__mongodb)
-		    		return Promise.value(this.__mongodb);
-		    	var promise = Promise.create();
-		        this.mongo_module.MongoClient.connect('mongodb://' + this.__dbUri, {
-		            server: {
-		                'auto_reconnect': true
-		            }
-		        }, promise.asyncCallbackFunc());
-		        return promise.success(function (db) {
-		        	this.__mongodb = db;
-		        }, this);
-		    }
-		};
-		
-    }, {
-	
-	    uriToObject : function(uri) {
-	        var parsed = Uri.parse(uri);
-	        return {
-	            database : Strings.strip_start(parsed.path, "/"),
-	            server : parsed.host,
-	            port : parsed.port,
-	            username : parsed.user,
-	            password : parsed.password
-	        };
-	    },
-	
-	    objectToUri : function(object) {
-	        object.path = object.database;
-	        return Uri.build(object);
-	    }
-	    
-	}); 
-});
-Scoped.define("module:Databases.MongoDatabaseTable", [      
-        "module:Databases.DatabaseTable",
-        "base:Promise",
-        "base:Objs",
-        "base:Iterators.ArrayIterator"
-    ], function (DatabaseTable, Promise, Objs, ArrayIterator, scoped) {
-    return DatabaseTable.extend({scoped: scoped}, {
-		
-		table: function () {
-			if (this.__table)
-				return Promise.create(this.__table);
-			return this._database.mongodb().mapSuccess(function (db) {
-				this.__table = db.collection(this._table_name);
-				return this.__table;
-			}, this);
-		},
-		
-		_encode: function (data) {
-			var obj = Objs.clone(data, 1);
-			if ("id" in data) {
-				delete obj.id;
-				if (data.id !== null) {
-		            var objid = this._database.mongo_object_id();
-		            obj._id = new objid(data.id + "");
-				}
-			}
-			return obj;
-		},
-		
-		_decode: function (data) {
-			var obj = Objs.clone(data, 1);
-			if ("_id" in data) {
-				delete obj._id;
-				obj.id = data._id;
-			}
-			return obj;
-		},
-	
-		_find: function (query, options) {
-			return this.table().mapSuccess(function (table) {
-				return Promise.funcCallback(table, table.find, query).mapSuccess(function (result) {
-					options = options || {};
-					if ("sort" in options)
-						result = result.sort(options.sort);
-					if ("skip" in options)
-						result = result.skip(options.skip);
-					if ("limit" in options)
-						result = result.limit(options.limit);
-					return Promise.funcCallback(result, result.toArray).mapSuccess(function (cols) {
-						return new ArrayIterator(cols);
-					}, this);
-				}, this);
-			}, this);
-		},
-	
-		_insertRow: function (row) {
-			return this.table().mapSuccess(function (table) {
-				return Promise.funcCallback(table, table.insert, row).mapSuccess(function (result) {
-					return row;
-				}, this);
-			}, this);
-		},
-		
-		_removeRow: function (query, callbacks) {
-			return this.table().mapSuccess(function (table) {
-				return Promise.funcCallback(table, table.remove, query); 
-			}, this);
-		},
-		
-		_updateRow: function (query, row, callbacks) {
-			return this.table().mapSuccess(function (table) {
-				return Promise.funcCallback(table, table.update, query, {"$set" : row}).mapSuccess(function () {
-					return row;
-				}); 
-			}, this);
-		},
-			
-		ensureIndex: function (key) {
-			var obj = {};
-			obj[key] = 1;
-			this.table().success(function (table) {
-				table.ensureIndex(Objs.objectBy(key, 1));
-			});
-		}	
-		
-    });
-});
 
 Scoped.define("module:Stores.DatabaseStore", [      
         "data:Stores.BaseStore",

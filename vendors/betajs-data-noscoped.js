@@ -1,32 +1,712 @@
-/*!
-betajs-data - v1.0.15 - 2016-01-18
-Copyright (c) Oliver Friedmann
-Apache 2.0 Software License.
-*/
 (function () {
-
 var Scoped = this.subScope();
-
-Scoped.binding("module", "global:BetaJS.Data");
-Scoped.binding("base", "global:BetaJS");
-Scoped.binding("json", "global:JSON");
-
+Scoped.binding('module', 'global:BetaJS.Data');
+Scoped.binding('base', 'global:BetaJS');
+Scoped.binding('jquery', 'global:jQuery');
+Scoped.binding('resumablejs', 'global:Resumable');
 Scoped.define("module:", function () {
 	return {
-		guid: "70ed7146-bb6d-4da4-97dc-5a8e2d23a23f",
-		version: '62.1453156645654'
-	};
+    "guid": "70ed7146-bb6d-4da4-97dc-5a8e2d23a23f",
+    "version": "69.1455672216034"
+};
+});
+Scoped.assumeVersion('base:version', 474);
+/**
+ * @class AbstractQueryCollection
+ *
+ * A base class for querying collections. Subclasses specify the expected type
+ * of data store and specify whether the query collection is active.
+ */
+Scoped.define("module:Collections.AbstractQueryCollection", [      
+                                                     "base:Collections.Collection",
+                                                     "base:Objs",
+                                                     "base:Types",
+                                                     "base:Comparators",
+                                                     "base:Promise",
+                                                     "base:Class",
+                                                     "module:Queries.Constrained",
+                                                     "module:Queries"
+                                                     ], function (Collection, Objs, Types, Comparators, Promise, Class, Constrained, Queries, scoped) {
+	return Collection.extend({scoped: scoped}, function (inherited) {
+		return {
+
+			/**
+		       * @method constructor
+		       *
+		       * @param {object} source The source object
+		       * can either be an instance of a Table
+		       * or a Store. A Table should be used if validations and other data
+		       * processing methods are desired. A Store is sufficient if just
+		       * performing simple queries and returning the results with little
+		       * manipulation.
+		       *
+		       * @param {object} query The query object contains keys specifying query
+		       * parameters and values specifying their respective values. This query
+		       * object can be updated later with the `set_query` method.
+		       *
+		       * @param {object} options The options object contains keys specifying
+		       * option parameters and values specifying their respective values.
+		       *
+		       * @return {QueryCollection} A new instance of QueryCollection.
+		       */
+			constructor: function (source, query, options) {
+				inherited.constructor.call(this);
+				options = options || {};
+				this._id_key = this._id_key || options.id_key || "id";
+				this._source = source;
+				this._complete = false;
+				this._active = options.active || false;
+				this._incremental = "incremental" in options ? options.incremental : true; 
+				this._active_bounds = "active_bounds" in options ? options.active_bounds : true;
+				this._enabled = false;
+				this._range = options.range || null;
+				this._forward_steps = options.forward_steps || null;
+				this._backward_steps = options.backward_steps || null;
+				if (this._active) {
+					this.on("add", function (object) {
+						this._watchItem(object.get(this._id_key));
+					}, this);
+					this.on("remove", function (object) {
+						this._unwatchItem(object.get(this._id_key));
+					}, this);
+				}
+				this._query = {
+					query: {},
+					options: {
+						skip: 0,
+						limit: null,
+						sort: null
+					}
+				};
+				this.update(Objs.tree_extend({
+					query: {},
+					options: {
+						skip: options.skip || 0,
+						limit: options.limit || options.range || null,
+						sort: options.sort || null
+					}
+				}, query ? (query.query || query.options ? query : {query: query}) : {}));
+				if (options.auto)
+					this.enable();
+			},
+
+			destroy: function () {
+				this.disable();
+				if (this._watcher()) {
+					this._watcher()._unwatchInsert(null, this);
+					this._watcher()._unwatchItem(null, this);
+				}
+				inherited.destroy.call(this);
+			},
+
+			
+		      /**
+		       * @method paginate
+		       *
+		       * Paginate to a specific page.
+		       *
+		       * @param {int} index The page to paginate to.
+		       *
+		       * @return {Promise} Promise from query execution.
+		       */
+			
+			paginate: function (index) {
+				return this.update({options: {
+					skip: index * this._range,
+					limit: this._range
+				}});
+			},
+			
+		      /**
+		       * @method paginate_index
+		       *
+		       * @return {int} Current pagination page.
+		       */
+			paginate_index: function () {
+				return Math.floor(this.getSkip() / this._range);
+			},
+			
+		      /**
+		       * @method paginate_next
+		       *
+		       * Update the query to paginate to the next page.
+		       *
+		       * @return {Promise} Promise of the query.
+		       */
+			paginate_next: function () {
+				return this.isComplete() ? Promise.create(true) : this.paginate(this.paginate_index() + 1);
+			},
+			
+	      /**
+	       * @method paginate_prev
+	       *
+	       * Update the query to paginate to the previous page.
+	       *
+	       * @return {Promise} Promise of the query.
+	       */
+			paginate_prev: function () {
+				return this.paginate_index() > 0 ? this.paginate(this.paginate_index() - 1) : Promise.create(true);
+			},		
+			
+			increase_forwards: function (steps) {
+				steps = steps || this._forward_steps;
+				return this.isComplete() ? Promise.create(true) : this.update({options: {
+					limit: this.getLimit() + steps
+				}});
+			},
+
+			increase_backwards: function (steps) {
+				steps = steps || this._backward_steps;
+				return !this.getSkip() ? Promise.create(true) : this.update({options: {
+					skip: Math.max(this.getSkip() - steps, 0),
+					limit: this.getLimit() ? this.getLimit() + this.getSkip() - Math.max(this.getSkip() - steps, 0) : null  
+				}});
+			},
+			
+
+			get_ident: function (obj) {
+				return Class.is_class_instance(obj) ? obj.get(this._id_key) : obj[this._id_key];
+			},
+
+			getQuery: function () {
+				return this._query;
+			},
+
+			getSkip: function () {
+				return this._query.options.skip || 0;
+			},
+
+			getLimit: function () {
+				return this._query.options.limit || null;
+			},
+
+		      /**
+		       * @method update
+		       *
+		       * Update the collection with a new query. Setting the query not only
+		       * updates the query field, but also updates the data with the results of
+		       * the new query.
+		       *
+		       * @param {object} constrainedQuery The new query for this collection.
+		       *
+		       * @example
+		       * // Updates the query dictating the collection contents.
+		       * collectionQuery.update({query: {'queryField': 'queryValue'}, options: {skip: 10}});
+		       */
+			update: function (constrainedQuery) {
+				var hasQuery = !!constrainedQuery.query;
+				constrainedQuery = Constrained.rectify(constrainedQuery);
+				var currentSkip = this._query.options.skip || 0;
+				var currentLimit = this._query.options.limit || null;
+				if (constrainedQuery.query)
+					this._query.query = constrainedQuery.query;
+				this._query.options = Objs.extend(this._query.options, constrainedQuery.options);
+				if (!this._enabled)
+					return Promise.create(true);
+				if (hasQuery || "sort" in constrainedQuery.options || !this._incremental)					
+					return this.refresh(true);
+				var nextSkip = "skip" in constrainedQuery.options ? constrainedQuery.options.skip || 0 : currentSkip;
+				var nextLimit = "limit" in constrainedQuery.options ? constrainedQuery.options.limit || null : currentLimit;
+				if (nextSkip === currentSkip && nextLimit === currentLimit)
+					return Promise.create(true);
+				// No overlap
+				if ((nextLimit && nextSkip + nextLimit <= currentSkip) || (currentLimit && currentSkip + currentLimit <= nextSkip))
+					return this.refresh(true);
+				// Make sure that currentSkip >= nextSkip
+				while (currentSkip < nextSkip && (currentLimit === null || currentLimit > 0)) {
+					this.remove(this.getByIndex(0));
+					currentSkip++;
+					currentLimit--;
+				}
+				var promise = Promise.create(true);
+				// Make sure that nextSkip === currentSkip
+				if (nextSkip < currentSkip) {
+					var leftLimit = currentSkip - nextSkip;
+					if (nextLimit !== null)
+						leftLimit = Math.min(leftLimit, nextLimit);
+					promise = this._execute(Objs.tree_extend(Objs.clone(this._query, 2), {options: {
+						skip: nextSkip,
+						limit: leftLimit    
+					}}, 2), true);
+					nextSkip += leftLimit;
+					if (nextLimit !== null)
+						nextLimit -= leftLimit;
+				}
+				if (!currentLimit || (nextLimit && nextLimit <= currentLimit)) {
+					if (nextLimit)
+						while (this.count() > nextLimit)
+							this.remove(this.getByIndex(this.count() - 1));
+					return promise;
+				}
+				return promise.and(this._execute(Objs.tree_extend(Objs.clone(this._query, 2), {
+					options: {
+						skip: currentSkip + currentLimit,
+						limit: !nextLimit ? null : nextLimit - currentLimit
+					}
+				}, 2), true));
+			},
+
+			enable: function () {
+				if (this._enabled)
+					return;
+				this._enabled = true;
+				this.refresh();
+			},
+
+			disable: function () {
+				if (!this._enabled)
+					return;
+				this._enabled = false;
+				this.clear();
+				this._unwatchInsert();
+			},
+
+			refresh: function (clear) {
+				if (clear && !this._incremental)
+					this.clear();
+				if (this._query.options.sort && !Types.is_empty(this._query.options.sort)) {
+					this.set_compare(Comparators.byObject(this._query.options.sort));
+				} else {
+					this.set_compare(null);
+				}
+				this._unwatchInsert();
+				if (this._active)
+					this._watchInsert(this._query);
+				return this._execute(this._query, !(clear && this._incremental));
+			},
+
+			isEnabled: function () {
+				return this._enabled;
+			},
+
+		      /**
+		       * @method _execute
+		       *
+		       * Execute a constrained query. This method is called whenever a new query is set.
+		       * Doesn't override previous reults.
+		       *
+		       * @protected
+		       *
+		       * @param {constrainedQuery} constrainedQuery The constrained query that should be executed
+		       *
+		       * @return {Promise} Promise from executing query.
+		       */
+			_execute: function (constrainedQuery, keep_others) {
+				var limit = constrainedQuery.options.limit;
+				return this._subExecute(constrainedQuery.query, constrainedQuery.options).mapSuccess(function (iter) {
+					var result = iter.asArray();
+					this._complete = limit === null || result.length < limit;
+					this.replace_objects(result, keep_others);
+					return true;
+				}, this);
+			},
+
+		      /**
+		       * @method _sub_execute
+		       *
+		       * Run the specified query on the data source.
+		       *
+		       * @private
+		       *
+		       * @param {object} options The options for the subquery.
+		       *
+		       * @return {object} Iteratable object containing query results.
+		       */
+			_subExecute: function (query, options) {
+				return this._source.query(query, options);
+			},
+
+		      /**
+		       * @method isComplete
+		       *
+		       * @return {boolean} Return value indicates if the query has finished/if
+		       * data has been returned.
+		       */
+			isComplete: function () {
+				return this._complete;
+			},
+			
+			isValid: function (data) {
+				return Queries.evaluate(this._query.query, data);
+			},
+
+			_materialize: function (data) {
+				return data;
+			},
+
+			_activeCreate: function (data) {
+				if (!this._active || !this._enabled)
+					return;
+				if (!this.isValid(data))
+					return;
+				this.add(this._materialize(data));
+				if (this._query.options.limit && this.count() > this._query.options.limit) {
+					if (this._active_bounds)
+						this._query.options.limit++;
+					else
+						this.remove(this.getByIndex(this.count() - 1));
+				}
+			},
+
+			_activeRemove: function (id) {
+				if (!this._active || !this._enabled)
+					return;
+				var object = this.getById(id);
+				if (!object)
+					return;
+				this.remove(object);
+				if (this._query.options.limit !== null) {
+					if (this._active_bounds)
+						this._query.options.limit--;
+				}
+			},
+
+			_activeUpdate: function (id, data, row) {
+				if (!this._active || !this._enabled)
+					return;
+				var object = this.getById(id);
+				var merged = Objs.extend(row, data);
+				if (!object)
+					this._activeCreate(merged);
+				else if (!this.isValid(merged))
+					this._activeRemove(id);
+				else
+					object.setAll(data);
+			},
+
+			_watcher: function () {
+				return null;
+			},
+			
+			_watchInsert: function (query) {
+				if (this._watcher())
+					this._watcher().watchInsert(query, this);
+			},
+
+			_unwatchInsert: function () {
+				if (this._watcher())
+					this._watcher().unwatchInsert(null, this);
+			},
+			
+			_watchItem: function (id) {
+				if (this._watcher())
+					this._watcher().watchItem(id, this);
+			},
+			
+			_unwatchItem: function (id) {
+				if (this._watcher())
+					this._watcher().unwatchItem(id, this);
+			}			
+
+		};
+	});
 });
 
-Scoped.assumeVersion("base:version", 444);
+
+
+
+Scoped.define("module:Collections.StoreQueryCollection", [      
+                                                          "module:Collections.AbstractQueryCollection",
+                                                          "base:Objs"
+                                                          ], function (QueryCollection, Objs, scoped) {
+	return QueryCollection.extend({scoped: scoped}, function (inherited) {
+		return {
+
+			constructor: function (source, query, options) {
+				inherited.constructor.call(this, source, query, Objs.extend({
+					id_key: source.id_key()
+				}, options));
+				this._source = source;
+				source.on("insert", this._activeCreate, this);
+				source.on("remove", this._activeRemove, this);
+				source.on("update", function (row, data) {
+					this._activeUpdate(source.id_of(row), data, row);
+				}, this);
+			},
+
+			destroy: function () {
+				this._source.off(null, null, this);
+				inherited.destroy.call(this);
+			},
+
+			get_ident: function (obj) {
+				return obj.get(this._source.id_key());
+			},
+			
+			_watcher: function () {
+				return this._source.watcher();
+			}
+
+		};
+	});
+});
+
+Scoped.define("module:Collections.TableQueryCollection", [      
+                                                          "module:Collections.AbstractQueryCollection",
+                                                          "base:Objs"
+                                                          ], function (QueryCollection, Objs, scoped) {
+	return QueryCollection.extend({scoped: scoped}, function (inherited) {
+		return {
+
+			constructor: function (source, query, options) {
+				inherited.constructor.call(this, source, query, Objs.extend({
+					id_key: source.primary_key()
+				}, options));
+				source.on("create", this._activeCreate, this);
+				source.on("remove", this._activeRemove, this);
+				source.on("update", this._activeUpdate, this);
+			},
+
+			destroy: function () {
+				this._source.off(null, null, this);
+				inherited.destroy.call(this);
+			},
+
+			_materialize: function (data) {
+				return this._source.materialize(data);
+			},
+			
+			_watcher: function () {
+				return this._source.store().watcher();
+			}
+
+		};
+	});
+});
+
+
+
+Scoped.define("module:Stores.AbstractIndex", [
+                                              "base:Class",
+                                              "base:Comparators",
+                                              "base:Objs",
+                                              "base:Functions"
+                                              ], function (Class, Comparators, Objs, Functions, scoped) {
+	return Class.extend({scoped: scoped}, function (inherited) {
+		return {
+
+			constructor: function (store, key, compare, options) {
+				inherited.constructor.call(this);
+				this._options = Objs.extend({
+					exact: true,
+					ignoreCase: false
+				}, options);
+				this._compare = compare || Comparators.byValue;
+				this._store = store;
+				this.__row_count = 0;
+				this._initialize();
+				var id_key = store.id_key();
+				store.query({}).value().iterate(function (row) {
+					this.__row_count++;
+					this._insert(row[id_key], row[key]);
+				}, this);
+				store.on("insert", function (row) {
+					this.__row_count++;
+					this._insert(row[id_key], row[key]);
+				}, this);
+				store.on("remove", function (id) {
+					this.__row_count--;
+					this._remove(id);
+				}, this);
+				store.on("update", function (id, data) {
+					if (key in data)
+						this._update(id, data[key]);
+				}, this);
+			},
+
+			_initialize: function () {},
+
+			destroy: function () {
+				this._store.off(null, null, this);
+				inherited.destroy.call(this);
+			},
+
+			compare: function () {
+				return this._compare.apply(arguments);
+			},
+
+			comparator: function () {
+				return Functions.as_method(this, this._compare);
+			},
+
+			info: function () {
+				return {
+					row_count: this.__row_count,
+					key_count: this._key_count(),
+					key_count_ic: this._key_count_ic()
+				};
+			},
+
+			options: function () {
+				return this._options;
+			},
+
+			iterate: function (key, direction, callback, context) {
+				this._iterate(key, direction, callback, context);
+			},
+
+			itemIterate: function (key, direction, callback, context) {
+				this.iterate(key, direction, function (iterKey, id) {
+					return callback.call(context, iterKey, this._store.get(id).value());
+				}, this); 
+			},
+
+			iterate_ic: function (key, direction, callback, context) {
+				this._iterate_ic(key, direction, callback, context);
+			},
+
+			itemIterateIc: function (key, direction, callback, context) {
+				this.iterate_ic(key, direction, function (iterKey, id) {
+					return callback.call(context, iterKey, this._store.get(id).value());
+				}, this); 
+			},
+
+			_iterate: function (key, direction, callback, context) {},
+
+			_iterate_ic: function (key, direction, callback, context) {},
+
+			_insert: function (id, key) {},
+
+			_remove: function (id) {},
+
+			_update: function (id, key) {},
+
+			_key_count: function () {},
+
+			_key_count_ic: function () {},
+
+			key_count_left_ic: function (key) {},
+			key_count_right_ic: function (key) {},
+			key_count_distance_ic: function (leftKey, rightKey) {},
+			key_count_left: function (key) {},
+			key_count_right: function (key) {},
+			key_count_distance: function (leftKey, rightKey) {}
+
+		};
+	});
+});
+
+Scoped.define("module:Stores.MemoryIndex", [
+                                            "module:Stores.AbstractIndex",
+                                            "base:Structures.TreeMap",
+                                            "base:Objs"
+                                            ], function (AbstractIndex, TreeMap, Objs, scoped) {
+	return AbstractIndex.extend({scoped: scoped}, function (inherited) {
+		return {
+
+			_initialize: function () {
+				if (this._options.exact)
+					this._exactMap = TreeMap.empty(this._compare);
+				if (this._options.ignoreCase)
+					this._ignoreCaseMap = TreeMap.empty(this._compare);
+				this._idToKey = {};
+			},
+
+			__insert: function (id, key, map) {
+				var value = TreeMap.find(key, map);
+				if (value)
+					value[id] = true;
+				else 
+					map = TreeMap.add(key, Objs.objectBy(id, true), map);
+				return map;
+			},
+
+			_insert: function (id, key) {
+				this._idToKey[id] = key;
+				if (this._options.exact)
+					this._exactMap = this.__insert(id, key, this._exactMap);
+				if (this._options.ignoreCase)
+					this._ignoreCaseMap = this.__insert(id, key, this._ignoreCaseMap);
+			},
+
+			__remove: function (key, map, id) {
+				var value = TreeMap.find(key, map);
+				delete value[id];
+				if (Objs.is_empty(value))
+					map = TreeMap.remove(key, map);
+				return map;
+			},
+
+			_remove: function (id) {
+				var key = this._idToKey[id];
+				delete this._idToKey[id];
+				if (this._options.exact)
+					this._exactMap = this.__remove(key, this._exactMap, id);
+				if (this._options.ignoreCase)
+					this._ignoreCaseMap = this.__remove(key, this._ignoreCaseMap, id);
+			},
+
+			_update: function (id, key) {
+				var old_key = this._idToKey[id];
+				if (old_key == key)
+					return;
+				this._remove(id);
+				this._insert(id, key);
+			},
+
+			_iterate: function (key, direction, callback, context) {
+				TreeMap.iterate_from(key, this._exactMap, function (iterKey, value) {
+					for (var id in value) {
+						if (callback.call(context, iterKey, id) === false)
+							return false;
+					}
+					return true;
+				}, this, !direction);
+			},	
+
+			_iterate_ic: function (key, direction, callback, context) {
+				TreeMap.iterate_from(key, this._ignoreCaseMap, function (iterKey, value) {
+					for (var id in value) {
+						if (callback.call(context, iterKey, id) === false)
+							return false;
+					}
+					return true;
+				}, this, !direction);
+			},	
+
+			_key_count: function () {
+				return this._options.exact ? TreeMap.length(this._exactMap) : 0;
+			},
+
+			_key_count_ic: function () {
+				return this._options.ignoreCase ? TreeMap.length(this._ignoreCaseMap) : 0;
+			},
+
+			key_count_left_ic: function (key) {
+				return TreeMap.treeSizeLeft(key, this._ignoreCaseMap);
+			},
+
+			key_count_right_ic: function (key) {
+				return TreeMap.treeSizeRight(key, this._ignoreCaseMap);
+			},
+
+			key_count_distance_ic: function (leftKey, rightKey) {
+				return TreeMap.distance(leftKey, rightKey, this._ignoreCaseMap);
+			},
+
+			key_count_left: function (key) {
+				return TreeMap.treeSizeLeft(key, this._exactMap);
+			},
+
+			key_count_right: function (key) {
+				return TreeMap.treeSizeRight(key, this._exactMap);
+			},
+
+			key_count_distance: function (leftKey, rightKey) {
+				return TreeMap.distance(leftKey, rightKey, this._exactMap);
+			}
+
+		};
+	});
+});
+
 Scoped.define("module:Queries.Constrained", [
-                                             "json:",
                                              "module:Queries",
                                              "base:Types",
                                              "base:Objs",
                                              "base:Tokens",
                                              "base:Comparators"
-                                             ], function (JSON, Queries, Types, Objs, Tokens, Comparators) {
+                                             ], function (Queries, Types, Objs, Tokens, Comparators) {
 	return {
 
 		/*
@@ -184,7 +864,6 @@ Scoped.define("module:Queries.Constrained", [
 	}; 
 });
 Scoped.define("module:Queries", [
-                                 "json:",
                                  "base:Types",
                                  "base:Sort",
                                  "base:Objs",
@@ -194,7 +873,7 @@ Scoped.define("module:Queries", [
                                  "base:Iterators.FilteredIterator",
                                  "base:Strings",
                                  "base:Comparators"
-                                 ], function (JSON, Types, Sort, Objs, Class, Tokens, ArrayIterator, FilteredIterator, Strings, Comparators) {
+                                 ], function (Types, Sort, Objs, Class, Tokens, ArrayIterator, FilteredIterator, Strings, Comparators) {
 
 	var SYNTAX_PAIR_KEYS = {
 			"$or": {
@@ -254,7 +933,7 @@ Scoped.define("module:Queries", [
 	Objs.iter(Objs.clone(SYNTAX_CONDITION_KEYS, 1), function (value, key) {
 		var valueic = Objs.clone(value, 1);
 		valueic.evaluate_single = function (object_value, condition_value) {
-			return value.evaluate_single(object_value.toLowerCase(), condition_value.toLowerCase());
+			return value.evaluate_single(Types.is_string(object_value) ? object_value.toLowerCase() : object_value, Types.is_string(condition_value) ? condition_value.toLowerCase() : condition_value);
 		};
 		valueic.ignore_case = true;
 		SYNTAX_CONDITION_KEYS[key + "ic"] = valueic;
@@ -568,6 +1247,11 @@ Scoped.define("module:Queries", [
 				}
 			}, this);
 			return result;
+		},
+		
+		simplifiedDNF: function (query, mergeKeys) {
+			query = this.simplifyQuery(this.disjunctiveNormalForm(query, true));
+			return !Types.is_empty(query) ? query : {"$or": [{}]};
 		},
 
 		simplifyConditions: function (conditions) {
@@ -913,16 +1597,16 @@ Scoped.define("module:Queries.Engine", [
 			indices = indices || {};
 			if (this.queryPartially(constrainedQuery, constrainedQueryCapabilities) || Types.is_empty(indices))
 				return this.compileQuery(constrainedQuery, constrainedQueryCapabilities, constrainedQueryFunction, constrainedQueryContext);
+			var dnf = Queries.simplifiedDNF(constrainedQuery.query, true);
 			if (constrainedQuery.options.sort) {
 				var first = Objs.ithKey(constrainedQuery.options.sort, 0);
 				if (indices[first]) {
 					return this.compileIndexQuery({
-						query: Queries.simplifyQuery(Queries.disjunctiveNormalForm(constrainedQuery.query, true)),
+						query: dnf,
 						options: constrainedQuery.options
 					}, first, indices[first]);
 				}
 			}
-			var dnf = Queries.simplifyQuery(Queries.disjunctiveNormalForm(constrainedQuery.query, true));
 			var smallestSize = null;
 			var smallestKey = null;
 			Objs.iter(indices, function (index, key) {
@@ -2290,10 +2974,7 @@ Scoped.define("module:Stores.DumbStore", [
 
 //Stores everything permanently in the browser's local storage
 
-Scoped.define("module:Stores.LocalStore", [
-                                           "module:Stores.AssocDumbStore",
-                                           "json:"
-                                           ], function (AssocDumbStore, JSON, scoped) {
+Scoped.define("module:Stores.LocalStore", ["module:Stores.AssocDumbStore"], function (AssocDumbStore, scoped) {
 	return AssocDumbStore.extend({scoped: scoped}, function (inherited) {			
 		return {
 
@@ -2470,9 +3151,8 @@ Scoped.define("module:Stores.Invokers.StoreInvokeeRestInvoker", [
     "base:Class",
     "base:Objs",
     "base:Types",
-    "json:",
     "module:Stores.Invokers.StoreInvokee"
-], function (Class, Objs, Types, JSON, Invokee, scoped) {
+], function (Class, Objs, Types, Invokee, scoped) {
 	return Class.extend({scoped: scoped}, [Invokee, function (inherited) {
 		return {
 			
@@ -2566,9 +3246,8 @@ Scoped.define("module:Stores.Invokers.RouteredRestInvokeeStoreInvoker", [
      "base:Class",
      "base:Objs",
      "base:Types",
-     "json:",
      "module:Stores.Invokers.RouteredRestInvokee"
- ], function (Class, Objs, Types, JSON, Invokee, scoped) {
+ ], function (Class, Objs, Types, Invokee, scoped) {
  	return Class.extend({scoped: scoped}, [Invokee, function (inherited) {
  		return {
 
@@ -3747,6 +4426,62 @@ Scoped.define("module:Stores.Watchers.ProducerWatcher", [
 	});
 });
 
+Scoped.define("module:Stores.Watchers.ListWatcher", [
+    "module:Stores.Watchers.StoreWatcher",
+    "base:Objs"
+], function(StoreWatcher, Objs, scoped) {
+	return StoreWatcher.extend({scoped: scoped}, function (inherited) {
+		return {
+
+			constructor: function (store, watchers, options) {
+				options = options || {};
+				options.id_key = store.id_key();
+				this.__watchers = watchers;
+				inherited.constructor.call(this, options);
+				this.__forEachWatcher(function (watcher) {
+					this.delegateEvents(["insert", "update", "remove"], watcher);
+				});
+			},
+			
+			__forEachWatcher: function (f) {
+				Objs.iter(this.__watchers, f, this);
+			},
+
+			destroy: function () {
+				this.__forEachWatcher(function (watcher) {
+					watcher.off(null, null, this);
+				});
+				inherited.destroy.apply(this);
+			},
+			
+			_watchItem : function(id) {
+				this.__forEachWatcher(function (watcher) {
+					watcher.watchItem(id);
+				});
+			},
+
+			_unwatchItem : function(id) {
+				this.__forEachWatcher(function (watcher) {
+					watcher.unwatchItem(id);
+				});
+			},
+
+			_watchInsert : function(query) {
+				this.__forEachWatcher(function (watcher) {
+					watcher.watchInsert(query);
+				});
+			},
+
+			_unwatchInsert : function(query) {
+				this.__forEachWatcher(function (watcher) {
+					watcher.unwatchInsert(query);
+				});
+			}
+
+		};
+	});
+});
+
 Scoped.define("module:Stores.Watchers.LocalWatcher", [
                                                       "module:Stores.Watchers.StoreWatcher"
                                                       ], function(StoreWatcher, scoped) {
@@ -4023,694 +4758,262 @@ Scoped.define("module:Stores.Watchers.StoreWatcher", [
 });
 
 
-Scoped.define("module:Stores.AbstractIndex", [
-                                              "base:Class",
-                                              "base:Comparators",
-                                              "base:Objs",
-                                              "base:Functions"
-                                              ], function (Class, Comparators, Objs, Functions, scoped) {
+Scoped.define("module:Modelling.Associations.Association", [
+                                                            "base:Class",
+                                                            "base:Promise",
+                                                            "base:Iterators"
+                                                            ], function (Class, Promise, Iterators, scoped) {
 	return Class.extend({scoped: scoped}, function (inherited) {
 		return {
 
-			constructor: function (store, key, compare, options) {
+			constructor: function (model, options) {
 				inherited.constructor.call(this);
-				this._options = Objs.extend({
-					exact: true,
-					ignoreCase: false
-				}, options);
-				this._compare = compare || Comparators.byValue;
-				this._store = store;
-				this.__row_count = 0;
-				this._initialize();
-				var id_key = store.id_key();
-				store.query({}).value().iterate(function (row) {
-					this.__row_count++;
-					this._insert(row[id_key], row[key]);
-				}, this);
-				store.on("insert", function (row) {
-					this.__row_count++;
-					this._insert(row[id_key], row[key]);
-				}, this);
-				store.on("remove", function (id) {
-					this.__row_count--;
-					this._remove(id);
-				}, this);
-				store.on("update", function (id, data) {
-					if (key in data)
-						this._update(id, data[key]);
-				}, this);
-			},
-
-			_initialize: function () {},
-
-			destroy: function () {
-				this._store.off(null, null, this);
-				inherited.destroy.call(this);
-			},
-
-			compare: function () {
-				return this._compare.apply(arguments);
-			},
-
-			comparator: function () {
-				return Functions.as_method(this, this._compare);
-			},
-
-			info: function () {
-				return {
-					row_count: this.__row_count,
-					key_count: this._key_count(),
-					key_count_ic: this._key_count_ic()
-				};
-			},
-
-			options: function () {
-				return this._options;
-			},
-
-			iterate: function (key, direction, callback, context) {
-				this._iterate(key, direction, callback, context);
-			},
-
-			itemIterate: function (key, direction, callback, context) {
-				this.iterate(key, direction, function (iterKey, id) {
-					return callback.call(context, iterKey, this._store.get(id).value());
-				}, this); 
-			},
-
-			iterate_ic: function (key, direction, callback, context) {
-				this._iterate_ic(key, direction, callback, context);
-			},
-
-			itemIterateIc: function (key, direction, callback, context) {
-				this.iterate_ic(key, direction, function (iterKey, id) {
-					return callback.call(context, iterKey, this._store.get(id).value());
-				}, this); 
-			},
-
-			_iterate: function (key, direction, callback, context) {},
-
-			_iterate_ic: function (key, direction, callback, context) {},
-
-			_insert: function (id, key) {},
-
-			_remove: function (id) {},
-
-			_update: function (id, key) {},
-
-			_key_count: function () {},
-
-			_key_count_ic: function () {},
-
-			key_count_left_ic: function (key) {},
-			key_count_right_ic: function (key) {},
-			key_count_distance_ic: function (leftKey, rightKey) {},
-			key_count_left: function (key) {},
-			key_count_right: function (key) {},
-			key_count_distance: function (leftKey, rightKey) {}
-
-		};
-	});
-});
-
-Scoped.define("module:Stores.MemoryIndex", [
-                                            "module:Stores.AbstractIndex",
-                                            "base:Structures.TreeMap",
-                                            "base:Objs"
-                                            ], function (AbstractIndex, TreeMap, Objs, scoped) {
-	return AbstractIndex.extend({scoped: scoped}, function (inherited) {
-		return {
-
-			_initialize: function () {
-				if (this._options.exact)
-					this._exactMap = TreeMap.empty(this._compare);
-				if (this._options.ignoreCase)
-					this._ignoreCaseMap = TreeMap.empty(this._compare);
-				this._idToKey = {};
-			},
-
-			__insert: function (id, key, map) {
-				var value = TreeMap.find(key, map);
-				if (value)
-					value[id] = true;
-				else 
-					map = TreeMap.add(key, Objs.objectBy(id, true), map);
-				return map;
-			},
-
-			_insert: function (id, key) {
-				this._idToKey[id] = key;
-				if (this._options.exact)
-					this._exactMap = this.__insert(id, key, this._exactMap);
-				if (this._options.ignoreCase)
-					this._ignoreCaseMap = this.__insert(id, key, this._ignoreCaseMap);
-			},
-
-			__remove: function (key, map, id) {
-				var value = TreeMap.find(key, map);
-				delete value[id];
-				if (Objs.is_empty(value))
-					map = TreeMap.remove(key, map);
-				return map;
-			},
-
-			_remove: function (id) {
-				var key = this._idToKey[id];
-				delete this._idToKey[id];
-				if (this._options.exact)
-					this._exactMap = this.__remove(key, this._exactMap, id);
-				if (this._options.ignoreCase)
-					this._ignoreCaseMap = this.__remove(key, this._ignoreCaseMap, id);
-			},
-
-			_update: function (id, key) {
-				var old_key = this._idToKey[id];
-				if (old_key == key)
-					return;
-				this._remove(id);
-				this._insert(id, key);
-			},
-
-			_iterate: function (key, direction, callback, context) {
-				TreeMap.iterate_from(key, this._exactMap, function (iterKey, value) {
-					for (var id in value) {
-						if (callback.call(context, iterKey, id) === false)
-							return false;
-					}
-					return true;
-				}, this, !direction);
-			},	
-
-			_iterate_ic: function (key, direction, callback, context) {
-				TreeMap.iterate_from(key, this._ignoreCaseMap, function (iterKey, value) {
-					for (var id in value) {
-						if (callback.call(context, iterKey, id) === false)
-							return false;
-					}
-					return true;
-				}, this, !direction);
-			},	
-
-			_key_count: function () {
-				return this._options.exact ? TreeMap.length(this._exactMap) : 0;
-			},
-
-			_key_count_ic: function () {
-				return this._options.ignoreCase ? TreeMap.length(this._ignoreCaseMap) : 0;
-			},
-
-			key_count_left_ic: function (key) {
-				return TreeMap.treeSizeLeft(key, this._ignoreCaseMap);
-			},
-
-			key_count_right_ic: function (key) {
-				return TreeMap.treeSizeRight(key, this._ignoreCaseMap);
-			},
-
-			key_count_distance_ic: function (leftKey, rightKey) {
-				return TreeMap.distance(leftKey, rightKey, this._ignoreCaseMap);
-			},
-
-			key_count_left: function (key) {
-				return TreeMap.treeSizeLeft(key, this._exactMap);
-			},
-
-			key_count_right: function (key) {
-				return TreeMap.treeSizeRight(key, this._exactMap);
-			},
-
-			key_count_distance: function (leftKey, rightKey) {
-				return TreeMap.distance(leftKey, rightKey, this._exactMap);
-			}
-
-		};
-	});
-});
-
-/**
- * @class AbstractQueryCollection
- *
- * A base class for querying collections. Subclasses specify the expected type
- * of data store and specify whether the query collection is active.
- */
-Scoped.define("module:Collections.AbstractQueryCollection", [      
-                                                     "base:Collections.Collection",
-                                                     "base:Objs",
-                                                     "base:Types",
-                                                     "base:Comparators",
-                                                     "base:Promise",
-                                                     "base:Class",
-                                                     "module:Queries.Constrained",
-                                                     "module:Queries"
-                                                     ], function (Collection, Objs, Types, Comparators, Promise, Class, Constrained, Queries, scoped) {
-	return Collection.extend({scoped: scoped}, function (inherited) {
-		return {
-
-			/**
-		       * @method constructor
-		       *
-		       * @param {object} source The source object
-		       * can either be an instance of a Table
-		       * or a Store. A Table should be used if validations and other data
-		       * processing methods are desired. A Store is sufficient if just
-		       * performing simple queries and returning the results with little
-		       * manipulation.
-		       *
-		       * @param {object} query The query object contains keys specifying query
-		       * parameters and values specifying their respective values. This query
-		       * object can be updated later with the `set_query` method.
-		       *
-		       * @param {object} options The options object contains keys specifying
-		       * option parameters and values specifying their respective values.
-		       *
-		       * @return {QueryCollection} A new instance of QueryCollection.
-		       */
-			constructor: function (source, query, options) {
-				inherited.constructor.call(this);
-				options = options || {};
-				this._id_key = this._id_key || options.id_key || "id";
-				this._source = source;
-				this._complete = false;
-				this._active = options.active || false;
-				this._incremental = "incremental" in options ? options.incremental : true; 
-				this._active_bounds = "active_bounds" in options ? options.active_bounds : true;
-				this._enabled = false;
-				this._range = options.range || null;
-				this._forward_steps = options.forward_steps || null;
-				this._backward_steps = options.backward_steps || null;
-				if (this._active) {
-					this.on("add", function (object) {
-						this._watchItem(object.get(this._id_key));
-					}, this);
-					this.on("remove", function (object) {
-						this._unwatchItem(object.get(this._id_key));
+				this._model = model;
+				this._options = options || {};
+				if (options.delete_cascade) {
+					model.on("remove", function () {
+						this.__delete_cascade();
 					}, this);
 				}
-				this._query = {
-					query: {},
-					options: {
-						skip: 0,
-						limit: null,
-						sort: null
-					}
-				};
-				this.update(Objs.tree_extend({
-					query: {},
-					options: {
-						skip: options.skip || 0,
-						limit: options.limit || options.range || null,
-						sort: options.sort || null
-					}
-				}, query ? (query.query || query.options ? query : {query: query}) : {}));
-				if (options.auto)
-					this.enable();
 			},
 
-			destroy: function () {
-				this.disable();
-				if (this._watcher()) {
-					this._watcher()._unwatchInsert(null, this);
-					this._watcher()._unwatchItem(null, this);
-				}
-				inherited.destroy.call(this);
-			},
-
-			
-		      /**
-		       * @method paginate
-		       *
-		       * Paginate to a specific page.
-		       *
-		       * @param {int} index The page to paginate to.
-		       *
-		       * @return {Promise} Promise from query execution.
-		       */
-			
-			paginate: function (index) {
-				return this.update({options: {
-					skip: index * this._range,
-					limit: this._range
-				}});
-			},
-			
-		      /**
-		       * @method paginate_index
-		       *
-		       * @return {int} Current pagination page.
-		       */
-			paginate_index: function () {
-				return Math.floor(this.getSkip() / this._range);
-			},
-			
-		      /**
-		       * @method paginate_next
-		       *
-		       * Update the query to paginate to the next page.
-		       *
-		       * @return {Promise} Promise of the query.
-		       */
-			paginate_next: function () {
-				return this.isComplete() ? Promise.create(true) : this.paginate(this.paginate_index() + 1);
-			},
-			
-	      /**
-	       * @method paginate_prev
-	       *
-	       * Update the query to paginate to the previous page.
-	       *
-	       * @return {Promise} Promise of the query.
-	       */
-			paginate_prev: function () {
-				return this.paginate_index() > 0 ? this.paginate(this.paginate_index() - 1) : Promise.create(true);
-			},		
-			
-			increase_forwards: function (steps) {
-				steps = steps || this._forward_steps;
-				return this.isComplete() ? Promise.create(true) : this.update({options: {
-					limit: this.getLimit() + steps
-				}});
-			},
-
-			increase_backwards: function (steps) {
-				steps = steps || this._backward_steps;
-				return !this.getSkip() ? Promise.create(true) : this.update({options: {
-					skip: Math.max(this.getSkip() - steps, 0),
-					limit: this.getLimit() ? this.getLimit() + this.getSkip() - Math.max(this.getSkip() - steps, 0) : null  
-				}});
-			},
-			
-
-			get_ident: function (obj) {
-				return Class.is_class_instance(obj) ? obj.get(this._id_key) : obj[this._id_key];
-			},
-
-			getQuery: function () {
-				return this._query;
-			},
-
-			getSkip: function () {
-				return this._query.options.skip || 0;
-			},
-
-			getLimit: function () {
-				return this._query.options.limit || null;
-			},
-
-		      /**
-		       * @method update
-		       *
-		       * Update the collection with a new query. Setting the query not only
-		       * updates the query field, but also updates the data with the results of
-		       * the new query.
-		       *
-		       * @param {object} constrainedQuery The new query for this collection.
-		       *
-		       * @example
-		       * // Updates the query dictating the collection contents.
-		       * collectionQuery.update({query: {'queryField': 'queryValue'}, options: {skip: 10}});
-		       */
-			update: function (constrainedQuery) {
-				constrainedQuery = Constrained.rectify(constrainedQuery);
-				var currentSkip = this._query.options.skip || 0;
-				var currentLimit = this._query.options.limit || null;
-				if (constrainedQuery.query)
-					this._query.query = constrainedQuery.query;
-				this._query.options = Objs.extend(this._query.options, constrainedQuery.options);
-				if (!this._enabled)
-					return Promise.create(true);
-				if (constrainedQuery.query || "sort" in constrainedQuery.options || !this._incremental)					
-					return this.refresh();
-				var nextSkip = "skip" in constrainedQuery.options ? constrainedQuery.options.skip || 0 : currentSkip;
-				var nextLimit = "limit" in constrainedQuery.options ? constrainedQuery.options.limit || null : currentLimit;
-				if (nextSkip === currentSkip && nextLimit === currentLimit)
-					return Promise.create(true);
-				// No overlap
-				if ((nextLimit && nextSkip + nextLimit <= currentSkip) || (currentLimit && currentSkip + currentLimit <= nextSkip))
-					return this.refresh();
-				// Make sure that currentSkip >= nextSkip
-				while (currentSkip < nextSkip && (currentLimit === null || currentLimit > 0)) {
-					this.remove(this.getByIndex(0));
-					currentSkip++;
-					currentLimit--;
-				}
-				var promise = Promise.create(true);
-				// Make sure that nextSkip === currentSkip
-				if (nextSkip < currentSkip) {
-					var leftLimit = currentSkip - nextSkip;
-					if (nextLimit !== null)
-						leftLimit = Math.min(leftLimit, nextLimit);
-					promise = this._execute(Objs.tree_extend({options: {
-						skip: nextSkip,
-						limit: leftLimit    
-					}}, this._query, 2));
-					nextSkip += leftLimit;
-					if (nextLimit !== null)
-						nextLimit -= leftLimit;
-				}
-				if (!currentLimit || (nextLimit && nextLimit <= currentLimit)) {
-					if (nextLimit)
-						while (this.count() > nextLimit)
-							this.remove(this.getByIndex(this.count() - 1));
-					return promise;
-				}
-				return promise.and(this._execute(Objs.tree_extend({
-					options: {
-						skip: currentSkip + currentLimit,
-						limit: !nextLimit ? null : nextLimit - currentLimit
-					}
-				}, this._query, 2)));
-			},
-
-			enable: function () {
-				if (this._enabled)
-					return;
-				this._enabled = true;
-				this.refresh();
-			},
-
-			disable: function () {
-				if (!this._enabled)
-					return;
-				this._enabled = false;
-				this.clear();
-				this._unwatchInsert();
-			},
-
-			refresh: function (clear) {
-				if (clear)
-					this.clear();
-				if (this._query.options.sort && !Types.is_empty(this._query.options.sort)) {
-					this.set_compare(Comparators.byObject(this._query.options.sort));
-				} else {
-					this.set_compare(null);
-				}
-				this._unwatchInsert();
-				if (this._active)
-					this._watchInsert(this._query);
-				return this._execute(this._query);
-			},
-
-			isEnabled: function () {
-				return this._enabled;
-			},
-
-		      /**
-		       * @method _execute
-		       *
-		       * Execute a constrained query. This method is called whenever a new query is set.
-		       * Doesn't override previous reults.
-		       *
-		       * @protected
-		       *
-		       * @param {constrainedQuery} constrainedQuery The constrained query that should be executed
-		       *
-		       * @return {Promise} Promise from executing query.
-		       */
-			_execute: function (constrainedQuery) {
-				var limit = constrainedQuery.options.limit;
-				return this._subExecute(constrainedQuery.query, constrainedQuery.options).mapSuccess(function (iter) {
-					var result = iter.asArray();
-					this._complete = limit === null || result.length < limit;
-					this.replace_objects(result);
-					return true;
+			__delete_cascade: function () {
+				this.execute().success(function (iter) {
+					iter = Iterators.ensure(iter);
+					while (iter.hasNext())
+						iter.next().remove({});
 				}, this);
 			},
 
-		      /**
-		       * @method _sub_execute
-		       *
-		       * Run the specified query on the data source.
-		       *
-		       * @private
-		       *
-		       * @param {object} options The options for the subquery.
-		       *
-		       * @return {object} Iteratable object containing query results.
-		       */
-			_subExecute: function (query, options) {
-				return this._source.query(query, options);
-			},
-
-		      /**
-		       * @method isComplete
-		       *
-		       * @return {boolean} Return value indicates if the query has finished/if
-		       * data has been returned.
-		       */
-			isComplete: function () {
-				return this._complete;
-			},
-			
-			isValid: function (data) {
-				return Queries.evaluate(this._query.query, data);
-			},
-
-			_materialize: function (data) {
-				return data;
-			},
-
-			_activeCreate: function (data) {
-				if (!this._active || !this._enabled)
-					return;
-				if (!this.isValid(data))
-					return;
-				this.add(this._materialize(data));
-				if (this._query.options.limit && this.count() > this._query.options.limit) {
-					if (this._active_bounds)
-						this._query.options.limit++;
-					else
-						this.remove(this.getByIndex(this.count() - 1));
+			execute: function () {
+				if ("__cache" in this)
+					return Promise.create(this.__cache);
+				var promise = this._execute();
+				if (this._options.cached) {
+					promise.callback(function (error, value) {
+						this.__cache = error ? null : value;
+					}, this);
 				}
+				return promise;
 			},
 
-			_activeRemove: function (id) {
-				if (!this._active || !this._enabled)
-					return;
-				var object = this.getById(id);
-				if (!object)
-					return;
-				this.remove(object);
-				if (this._query.options.limit !== null) {
-					if (this._active_bounds)
-						this._query.options.limit--;
-				}
-			},
-
-			_activeUpdate: function (id, data, row) {
-				if (!this._active || !this._enabled)
-					return;
-				var object = this.getById(id);
-				var merged = Objs.extend(row, data);
-				if (!object)
-					this._activeCreate(merged);
-				else if (!this.isValid(merged))
-					this._activeRemove(id);
-				else
-					object.setAll(data);
-			},
-
-			_watcher: function () {
-				return null;
-			},
-			
-			_watchInsert: function (query) {
-				if (this._watcher())
-					this._watcher().watchInsert(query, this);
-			},
-
-			_unwatchInsert: function () {
-				if (this._watcher())
-					this._watcher().unwatchInsert(null, this);
-			},
-			
-			_watchItem: function (id) {
-				if (this._watcher())
-					this._watcher().watchItem(id, this);
-			},
-			
-			_unwatchItem: function (id) {
-				if (this._watcher())
-					this._watcher().unwatchItem(id, this);
-			}			
-
-		};
-	});
-});
-
-
-
-
-Scoped.define("module:Collections.StoreQueryCollection", [      
-                                                          "module:Collections.AbstractQueryCollection",
-                                                          "base:Objs"
-                                                          ], function (QueryCollection, Objs, scoped) {
-	return QueryCollection.extend({scoped: scoped}, function (inherited) {
-		return {
-
-			constructor: function (source, query, options) {
-				inherited.constructor.call(this, source, query, Objs.extend({
-					id_key: source.id_key()
-				}, options));
-				this._source = source;
-				source.on("insert", this._activeCreate, this);
-				source.on("remove", this._activeRemove, this);
-				source.on("update", function (row, data) {
-					this._activeUpdate(source.id_of(row), data, row);
-				}, this);
-			},
-
-			destroy: function () {
-				this._source.off(null, null, this);
-				inherited.destroy.call(this);
-			},
-
-			get_ident: function (obj) {
-				return obj.get(this._source.id_key());
-			},
-			
-			_watcher: function () {
-				return this._source.watcher();
+			invalidate: function () {
+				delete this.__cache;
 			}
 
 		};
 	});
 });
-
-Scoped.define("module:Collections.TableQueryCollection", [      
-                                                          "module:Collections.AbstractQueryCollection",
-                                                          "base:Objs"
-                                                          ], function (QueryCollection, Objs, scoped) {
-	return QueryCollection.extend({scoped: scoped}, function (inherited) {
+Scoped.define("module:Modelling.Associations.BelongsToAssociation", [
+        "module:Modelling.Associations.TableAssociation",
+        "base:Promise",
+        "base:Objs"
+    ], function (TableAssociation, Promise, Objs, scoped) {
+    return TableAssociation.extend({scoped: scoped}, function (inherited) {
+		return {
+			
+			_execute: function () {
+				var value = this._model.get(this._foreign_key);
+				if (!value)
+					return Promise.value(null);
+				return this._primary_key ?
+					this._foreign_table.findBy(Objs.objectBy(this._primary_key, value)) :
+					this._foreign_table.findById(value);
+			}
+	
+		};
+    });
+});
+Scoped.define("module:Modelling.Associations.ConditionalAssociation", [
+                                                                       "module:Modelling.Associations.Association",
+                                                                       "base:Objs"
+                                                                       ], function (Associations, Objs, scoped) {
+	return Associations.extend({scoped: scoped}, function (inherited) {
 		return {
 
-			constructor: function (source, query, options) {
-				inherited.constructor.call(this, source, query, Objs.extend({
-					id_key: source.primary_key()
+			constructor: function (model, options) {
+				inherited.constructor.call(this, model, Objs.extend({
+					conditional: function () { return true; }
 				}, options));
-				source.on("create", this._activeCreate, this);
-				source.on("remove", this._activeRemove, this);
-				source.on("update", this._activeUpdate, this);
 			},
 
-			destroy: function () {
-				this._source.off(null, null, this);
-				inherited.destroy.call(this);
+			_execute: function () {
+				var assoc = this.assoc();
+				return assoc.execute.apply(assoc, arguments);
 			},
 
-			_materialize: function (data) {
-				return this._source.materialize(data);
-			},
-			
-			_watcher: function () {
-				return this._source.store().watcher();
+			assoc: function () {
+				return this._model.assocs[this._options.conditional(this._model)];
 			}
 
 		};
 	});
 });
+Scoped.define("module:Modelling.Associations.HasManyAssociation", [
+        "module:Modelling.Associations.TableAssociation",
+        "base:Objs",
+        "base:Iterators.ArrayIterator"
+    ], function (TableAssociation, Objs, ArrayIterator, scoped) {
+    return TableAssociation.extend({scoped: scoped}, function (inherited) {
+		return {
+		
+			_id: function () {
+				return this._primary_key ? this._model.get(this._primary_key) : this._model.id();
+			},
+		
+			_execute: function () {
+				return this.allBy();
+			},
+		
+			execute: function () {
+				return inherited.execute.call(this).mapSuccess(function (items) {
+					return new ArrayIterator(items);
+				});
+			},
+			
+			findBy: function (query) {
+				return this._foreign_table.findBy(Objs.objectBy(this._foreign_key, this._id()));
+			},
+		
+			allBy: function (query, id) {
+				return this._foreign_table.allBy(Objs.extend(Objs.objectBy(this._foreign_key, id ? id : this._id(), query)));
+			}
 
+		};
+    });
+});
+Scoped.define("module:Modelling.Associations.HasManyThroughArrayAssociation", [
+        "module:Modelling.Associations.HasManyAssociation",
+        "base:Promise",
+        "base:Objs"
+    ], function (HasManyAssociation, Promise, Objs, scoped) {
+    return HasManyAssociation.extend({scoped: scoped}, {
+		
+		_execute: function () {
+			var returnPromise = Promise.create();
+			var promises = Promise.and();
+			Objs.iter(this._model.get(this._foreign_key), function (id) {
+				promises = promises.and(this._foreign_table.findById(id));
+			}, this);
+			promises.forwardError(returnPromise).success(function (result) {
+				returnPromise.asyncSuccess(Objs.filter(result, function (item) {
+					return !!item;
+				}));
+			});
+			return returnPromise;
+		}
 
+    });
+});
+Scoped.define("module:Modelling.Associations.HasManyViaAssociation", [
+        "module:Modelling.Associations.HasManyAssociation",
+        "base:Objs",
+        "base:Promise"
+    ], function (HasManyAssociation, Objs, Promise, scoped) {
+    return HasManyAssociation.extend({scoped: scoped}, function (inherited) {
+		return {
+			
+			constructor: function (model, intermediate_table, intermediate_key, foreign_table, foreign_key, options) {
+				inherited.constructor.call(this, model, foreign_table, foreign_key, options);
+				this._intermediate_table = intermediate_table;
+				this._intermediate_key = intermediate_key;
+			},
+		
+			findBy: function (query) {
+				var returnPromise = Promise.create();
+				var intermediateQuery = Objs.objectBy(this._intermediate_key, this._id());
+				this._intermediate_table.findBy(intermediateQuery).forwardError(returnPromise).success(function (intermediate) {
+					if (intermediate) {
+						var full_query = Objs.extend(
+							Objs.clone(query, 1),
+							Objs.objectBy(this._foreign_table.primary_key(), intermediate.get(this._foreign_key)));
+						this._foreign_table.findBy(full_query).forwardCallback(returnPromise);
+					} else
+						returnPromise.asyncSuccess(null);
+				}, this);
+				return returnPromise;
+			},
+		
+			allBy: function (query, id) {
+				var returnPromise = Promise.create();
+				var intermediateQuery = Objs.objectBy(this._intermediate_key, id ? id : this._id());
+				this._intermediate_table.allBy(intermediateQuery).forwardError(returnPromise).success(function (intermediates) {
+					var promises = Promise.and();
+					while (intermediates.hasNext()) {
+						var intermediate = intermediates.next();
+						var full_query = Objs.extend(
+							Objs.clone(query, 1),
+							Objs.objectBy(this._foreign_table.primary_key(), intermediate.get(this._foreign_key)));
+						promises = promises.and(this._foreign_table.allBy(full_query));
+					}
+					promises.forwardError(returnPromise).success(function (foreignss) {
+						var results = [];
+						Objs.iter(foreignss, function (foreigns) {
+							while (foreigns.hasNext())
+								results.push(foreigns.next());
+						});
+						returnPromise.asyncSuccess(results);
+					}, this);
+				}, this);
+				return returnPromise;
+			}
 
+		};
+    });
+});
+Scoped.define("module:Modelling.Associations.HasOneAssociation", [
+        "module:Modelling.Associations.TableAssociation",
+        "base:Objs"
+    ], function (TableAssociation, Objs, scoped) {
+    return TableAssociation.extend({scoped: scoped}, {
+	
+		_execute: function (id) {
+			var value = id ? id : (this._primary_key ? this._model.get(this._primary_key) : this._model.id());
+			return this._foreign_table.findBy(Objs.objectBy(this._foreign_key, value));
+		}
+
+    });
+});
+Scoped.define("module:Modelling.Associations.PolymorphicHasOneAssociation", [
+        "module:Modelling.Associations.Association",
+        "base:Objs"
+    ], function (Association, Objs, scoped) {
+    return Association.extend({scoped: scoped}, function (inherited) {
+		return {
+			
+			constructor: function (model, foreign_table_key, foreign_key, options) {
+				inherited.constructor.call(this, model, options);
+				this._foreign_table_key = foreign_table_key;
+				this._foreign_key = foreign_key;
+				if (options.primary_key)
+					this._primary_key = options.primary_key;
+			},
+
+			_execute: function (id) {
+				var value = id ? id : (this._primary_key ? this._model.get(this._primary_key) : this._model.id());
+				var foreign_table = Scoped.getGlobal(this._model.get(this._foreign_table_key));
+				return foreign_table.findBy(Objs.objectBy(this._foreign_key, value));
+			}
+
+		};
+    });
+});
+
+Scoped.define("module:Modelling.Associations.TableAssociation", [
+        "module:Modelling.Associations.Association"
+    ], function (Association, scoped) {
+    return Association.extend({scoped: scoped}, function (inherited) {
+		return {
+			
+			constructor: function (model, foreign_table, foreign_key, options) {
+				inherited.constructor.call(this, model, options);
+				this._foreign_table = foreign_table;
+				this._foreign_key = foreign_key;
+			}
+
+		};
+    });
+});
 Scoped.define("module:Modelling.ModelException", [
                                                   "base:Exceptions.Exception"
                                                   ], function (Exception, scoped) {
@@ -4879,7 +5182,7 @@ Scoped.define("module:Modelling.Model", [
 									this.setError(key, value);
 								}, this);
 							}
-							return Exceptions.ensure(new ModalInvalidException(this));
+							return Exceptions.ensure(new ModelInvalidException(this));
 						}
 						this.__silent++;
 						this.setAll(result);
@@ -4890,7 +5193,7 @@ Scoped.define("module:Modelling.Model", [
 							this.__options.newModel = false;
 							this._registerEvents();
 						}
-						return result;
+						return this;
 					}, this);
 				}, this);
 			},
@@ -5297,262 +5600,6 @@ Scoped.define("module:Modelling.Table", [
 
 		};
 	}]);
-});
-Scoped.define("module:Modelling.Associations.Association", [
-                                                            "base:Class",
-                                                            "base:Promise",
-                                                            "base:Iterators"
-                                                            ], function (Class, Promise, Iterators, scoped) {
-	return Class.extend({scoped: scoped}, function (inherited) {
-		return {
-
-			constructor: function (model, options) {
-				inherited.constructor.call(this);
-				this._model = model;
-				this._options = options || {};
-				if (options.delete_cascade) {
-					model.on("remove", function () {
-						this.__delete_cascade();
-					}, this);
-				}
-			},
-
-			__delete_cascade: function () {
-				this.execute().success(function (iter) {
-					iter = Iterators.ensure(iter);
-					while (iter.hasNext())
-						iter.next().remove({});
-				}, this);
-			},
-
-			execute: function () {
-				if ("__cache" in this)
-					return Promise.create(this.__cache);
-				var promise = this._execute();
-				if (this._options.cached) {
-					promise.callback(function (error, value) {
-						this.__cache = error ? null : value;
-					}, this);
-				}
-				return promise;
-			},
-
-			invalidate: function () {
-				delete this.__cache;
-			}
-
-		};
-	});
-});
-Scoped.define("module:Modelling.Associations.BelongsToAssociation", [
-        "module:Modelling.Associations.TableAssociation",
-        "base:Promise",
-        "base:Objs"
-    ], function (TableAssociation, Promise, Objs, scoped) {
-    return TableAssociation.extend({scoped: scoped}, function (inherited) {
-		return {
-			
-			_execute: function () {
-				var value = this._model.get(this._foreign_key);
-				if (!value)
-					return Promise.value(null);
-				return this._primary_key ?
-					this._foreign_table.findBy(Objs.objectBy(this._primary_key, value)) :
-					this._foreign_table.findById(value);
-			}
-	
-		};
-    });
-});
-Scoped.define("module:Modelling.Associations.ConditionalAssociation", [
-                                                                       "module:Modelling.Associations.Association",
-                                                                       "base:Objs"
-                                                                       ], function (Associations, Objs, scoped) {
-	return Associations.extend({scoped: scoped}, function (inherited) {
-		return {
-
-			constructor: function (model, options) {
-				inherited.constructor.call(this, model, Objs.extend({
-					conditional: function () { return true; }
-				}, options));
-			},
-
-			_execute: function () {
-				var assoc = this.assoc();
-				return assoc.execute.apply(assoc, arguments);
-			},
-
-			assoc: function () {
-				return this._model.assocs[this._options.conditional(this._model)];
-			}
-
-		};
-	});
-});
-Scoped.define("module:Modelling.Associations.HasManyAssociation", [
-        "module:Modelling.Associations.TableAssociation",
-        "base:Objs",
-        "base:Iterators.ArrayIterator"
-    ], function (TableAssociation, Objs, ArrayIterator, scoped) {
-    return TableAssociation.extend({scoped: scoped}, function (inherited) {
-		return {
-		
-			_id: function () {
-				return this._primary_key ? this._model.get(this._primary_key) : this._model.id();
-			},
-		
-			_execute: function () {
-				return this.allBy();
-			},
-		
-			execute: function () {
-				return inherited.execute.call(this).mapSuccess(function (items) {
-					return new ArrayIterator(items);
-				});
-			},
-			
-			findBy: function (query) {
-				return this._foreign_table.findBy(Objs.objectBy(this._foreign_key, this._id()));
-			},
-		
-			allBy: function (query, id) {
-				return this._foreign_table.allBy(Objs.extend(Objs.objectBy(this._foreign_key, id ? id : this._id(), query)));
-			}
-
-		};
-    });
-});
-Scoped.define("module:Modelling.Associations.HasManyThroughArrayAssociation", [
-        "module:Modelling.Associations.HasManyAssociation",
-        "base:Promise",
-        "base:Objs"
-    ], function (HasManyAssociation, Promise, Objs, scoped) {
-    return HasManyAssociation.extend({scoped: scoped}, {
-		
-		_execute: function () {
-			var returnPromise = Promise.create();
-			var promises = Promise.and();
-			Objs.iter(this._model.get(this._foreign_key), function (id) {
-				promises = promises.and(this._foreign_table.findById(id));
-			}, this);
-			promises.forwardError(returnPromise).success(function (result) {
-				returnPromise.asyncSuccess(Objs.filter(result, function (item) {
-					return !!item;
-				}));
-			});
-			return returnPromise;
-		}
-
-    });
-});
-Scoped.define("module:Modelling.Associations.HasManyViaAssociation", [
-        "module:Modelling.Associations.HasManyAssociation",
-        "base:Objs",
-        "base:Promise"
-    ], function (HasManyAssociation, Objs, Promise, scoped) {
-    return HasManyAssociation.extend({scoped: scoped}, function (inherited) {
-		return {
-			
-			constructor: function (model, intermediate_table, intermediate_key, foreign_table, foreign_key, options) {
-				inherited.constructor.call(this, model, foreign_table, foreign_key, options);
-				this._intermediate_table = intermediate_table;
-				this._intermediate_key = intermediate_key;
-			},
-		
-			findBy: function (query) {
-				var returnPromise = Promise.create();
-				var intermediateQuery = Objs.objectBy(this._intermediate_key, this._id());
-				this._intermediate_table.findBy(intermediateQuery).forwardError(returnPromise).success(function (intermediate) {
-					if (intermediate) {
-						var full_query = Objs.extend(
-							Objs.clone(query, 1),
-							Objs.objectBy(this._foreign_table.primary_key(), intermediate.get(this._foreign_key)));
-						this._foreign_table.findBy(full_query).forwardCallback(returnPromise);
-					} else
-						returnPromise.asyncSuccess(null);
-				}, this);
-				return returnPromise;
-			},
-		
-			allBy: function (query, id) {
-				var returnPromise = Promise.create();
-				var intermediateQuery = Objs.objectBy(this._intermediate_key, id ? id : this._id());
-				this._intermediate_table.allBy(intermediateQuery).forwardError(returnPromise).success(function (intermediates) {
-					var promises = Promise.and();
-					while (intermediates.hasNext()) {
-						var intermediate = intermediates.next();
-						var full_query = Objs.extend(
-							Objs.clone(query, 1),
-							Objs.objectBy(this._foreign_table.primary_key(), intermediate.get(this._foreign_key)));
-						promises = promises.and(this._foreign_table.allBy(full_query));
-					}
-					promises.forwardError(returnPromise).success(function (foreignss) {
-						var results = [];
-						Objs.iter(foreignss, function (foreigns) {
-							while (foreigns.hasNext())
-								results.push(foreigns.next());
-						});
-						returnPromise.asyncSuccess(results);
-					}, this);
-				}, this);
-				return returnPromise;
-			}
-
-		};
-    });
-});
-Scoped.define("module:Modelling.Associations.HasOneAssociation", [
-        "module:Modelling.Associations.TableAssociation",
-        "base:Objs"
-    ], function (TableAssociation, Objs, scoped) {
-    return TableAssociation.extend({scoped: scoped}, {
-	
-		_execute: function (id) {
-			var value = id ? id : (this._primary_key ? this._model.get(this._primary_key) : this._model.id());
-			return this._foreign_table.findBy(Objs.objectBy(this._foreign_key, value));
-		}
-
-    });
-});
-Scoped.define("module:Modelling.Associations.PolymorphicHasOneAssociation", [
-        "module:Modelling.Associations.Association",
-        "base:Objs"
-    ], function (Association, Objs, scoped) {
-    return Association.extend({scoped: scoped}, function (inherited) {
-		return {
-			
-			constructor: function (model, foreign_table_key, foreign_key, options) {
-				inherited.constructor.call(this, model, options);
-				this._foreign_table_key = foreign_table_key;
-				this._foreign_key = foreign_key;
-				if (options.primary_key)
-					this._primary_key = options.primary_key;
-			},
-
-			_execute: function (id) {
-				var value = id ? id : (this._primary_key ? this._model.get(this._primary_key) : this._model.id());
-				var foreign_table = Scoped.getGlobal(this._model.get(this._foreign_table_key));
-				return foreign_table.findBy(Objs.objectBy(this._foreign_key, value));
-			}
-
-		};
-    });
-});
-
-Scoped.define("module:Modelling.Associations.TableAssociation", [
-        "module:Modelling.Associations.Association"
-    ], function (Association, scoped) {
-    return Association.extend({scoped: scoped}, function (inherited) {
-		return {
-			
-			constructor: function (model, foreign_table, foreign_key, options) {
-				inherited.constructor.call(this, model, options);
-				this._foreign_table = foreign_table;
-				this._foreign_key = foreign_key;
-			}
-
-		};
-    });
 });
 Scoped.define("module:Modelling.Validators.ConditionalValidator", [
         "module:Modelling.Validators.Validator",
