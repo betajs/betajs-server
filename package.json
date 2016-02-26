@@ -1,53 +1,74 @@
 {
-	"name": "betajs-server",
-	"version": "1.0.6",
-	"description": "BetaJS-Server is a server-side JavaScript framework extension for BetaJS.",
-	"homepage": "http://betajs.com",
-	"contributors": ["Oliver Friedmann"],
-	"license": "Apache 2.0",
-	"devDependencies": {
-		"grunt": "",
-		"grunt-contrib-jshint": "",
-		"grunt-contrib-nodeunit": "",
-		"grunt-contrib-concat": "",
-		"grunt-contrib-uglify": "",
-		"grunt-contrib-clean": "",
-		"grunt-preprocess": "",
-		"grunt-git-revision-count": "",
-		"grunt-closure-tools": "",
-		"grunt-node-qunit": "",
-		"grunt-contrib-jshint": "",
-		"grunt-wget": "",
-		"grunt-jsdoc": "",
-		"grunt-shell": "",
-		"grunt-template": "",
-		"grunt-betajs-docs-compile": "",
-		"betajs-scoped": "",
-		"betajs-compile": "betajs/betajs-compile"
-	},
-	"repository": {
-		"type": "git",
-		"url": "git://github.com/betajs/betajs-server.git"
-	},
-	"meta": {
-		"guid": "9955100d-6a88-451f-9a85-004523eb8589",
-		"blog": "http://blog.betajs.com",
-		"twitter": "http://twitter.com/thebetajs",
-		"badges": {
-			"codeclimate": true,
-			"travis": true,
-			"npm": false
-		},
-		"status": "Active, Production ready",
-		"compatability": {
-			"NodeJS": "0.10 - Latest" 
-		},
-		"weakDependencies": {
-			"betajs-scoped": "https://github.com/betajs/betajs-scoped"
-		},
-		"dependencies": {
-			"betajs": "https://github.com/betajs/betajs",
-			"betajs-data": "https://github.com/betajs/betajs-data"
-		}
-	} 
+    "homepage": "http://betajs.com",
+    "license": "Apache-2.0",
+    "licenses": [
+        {
+            "type": "Apache-2.0",
+            "url": "https://github.com/betajs/betajs-server/blob/master/LICENSE"
+        }
+    ],
+    "author": {
+        "name": "BetaJS",
+        "email": "info@betajs.com"
+    },
+    "bugs": {
+        "url": "https://github.com/betajs/betajs-server/issues"
+    },
+    "name": "betajs-server",
+    "version": "1.0.7",
+    "description": "BetaJS-Server is a server-side JavaScript framework extension for BetaJS.",
+    "contributors": [
+        "Oliver Friedmann"
+    ],
+    "devDependencies": {
+        "grunt": "",
+        "grunt-contrib-jshint": "",
+        "grunt-contrib-concat": "",
+        "grunt-contrib-uglify": "",
+        "grunt-contrib-clean": "",
+        "grunt-preprocess": "",
+        "grunt-git-revision-count": "",
+        "grunt-closure-tools": "",
+        "grunt-node-qunit": "",
+        "qunit": "",
+        "grunt-wget": "",
+        "grunt-jsdoc": "",
+        "grunt-shell": "",
+        "grunt-template": "",
+        "grunt-betajs-docs-compile": "",
+        "betajs-scoped": "",
+        "betajs-compile": "betajs/betajs-compile"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git://github.com/betajs/betajs-server.git"
+    },
+    "meta": {
+        "blog": "http://blog.betajs.com",
+        "twitter": "http://twitter.com/thebetajs",
+        "guid": "9955100d-6a88-451f-9a85-004523eb8589",
+        "installdoc": "docsrc/common/install.md",
+        "summarydoc": "docsrc/common/summary.md",
+        "badges": {
+            "codeclimate": true,
+            "travis": false,
+            "npm": false
+        },
+        "compatability": {
+            "NodeJS": "0.10 - Latest"
+        },
+        "weakDependencies": {
+            "betajs-scoped": "https://github.com/betajs/betajs-scoped"
+        },
+        "dependencies": {
+            "betajs": "https://github.com/betajs/betajs",
+            "betajs-data": "https://github.com/betajs/betajs-data"
+        },
+        "cdn": {
+            "betajs-server.js": "http://cdn.rawgit.com/betajs/betajs-server/master/dist/betajs-server.js",
+            "betajs-server.min.js": "http://cdn.rawgit.com/betajs/betajs-server/master/dist/betajs-server.min.js",
+            "betajs-server-noscoped.js": "http://cdn.rawgit.com/betajs/betajs-server/master/dist/betajs-server-noscoped.js",
+            "betajs-server-noscoped.min.js": "http://cdn.rawgit.com/betajs/betajs-server/master/dist/betajs-server-noscoped.min.js"
+        }
+    }
 }
