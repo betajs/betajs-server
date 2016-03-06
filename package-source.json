@@ -4,6 +4,7 @@
 	"description": "BetaJS-Server is a server-side JavaScript framework extension for BetaJS.",
 	"contributors": ["Oliver Friedmann"],
 	"devDependencies": {
+    	"lodash": "",
 		"grunt": "",
 		"grunt-contrib-jshint": "",
 		"grunt-contrib-concat": "",
