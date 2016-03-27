@@ -1,3 +1,9 @@
+/*!
+betajs-data - v1.0.26 - 2016-03-27
+Copyright (c) Oliver Friedmann
+Apache-2.0 Software License.
+*/
+
 (function () {
 var Scoped = this.subScope();
 Scoped.binding('module', 'global:BetaJS.Data');
@@ -7,7 +13,7 @@ Scoped.binding('resumablejs', 'global:Resumable');
 Scoped.define("module:", function () {
 	return {
     "guid": "70ed7146-bb6d-4da4-97dc-5a8e2d23a23f",
-    "version": "69.1455672216034"
+    "version": "77.1459096749119"
 };
 });
 Scoped.assumeVersion('base:version', 474);
@@ -50,7 +56,9 @@ Scoped.define("module:Collections.AbstractQueryCollection", [
 		       * @return {QueryCollection} A new instance of QueryCollection.
 		       */
 			constructor: function (source, query, options) {
-				inherited.constructor.call(this);
+				inherited.constructor.call(this, {
+					release_references: true
+				});
 				options = options || {};
 				this._id_key = this._id_key || options.id_key || "id";
 				this._source = source;
@@ -62,6 +70,7 @@ Scoped.define("module:Collections.AbstractQueryCollection", [
 				this._range = options.range || null;
 				this._forward_steps = options.forward_steps || null;
 				this._backward_steps = options.backward_steps || null;
+				this._async = options.async || false;
 				if (this._active) {
 					this.on("add", function (object) {
 						this._watchItem(object.get(this._id_key));
@@ -93,8 +102,8 @@ Scoped.define("module:Collections.AbstractQueryCollection", [
 			destroy: function () {
 				this.disable();
 				if (this._watcher()) {
-					this._watcher()._unwatchInsert(null, this);
-					this._watcher()._unwatchItem(null, this);
+					this._watcher().unwatchInsert(null, this);
+					this._watcher().unwatchItem(null, this);
 				}
 				inherited.destroy.call(this);
 			},
@@ -292,11 +301,24 @@ Scoped.define("module:Collections.AbstractQueryCollection", [
 		       * @return {Promise} Promise from executing query.
 		       */
 			_execute: function (constrainedQuery, keep_others) {
-				var limit = constrainedQuery.options.limit;
+				if (this.__executePromise) {
+					return this.__executePromise.mapCallback(function () {
+						return this._execute(constrainedQuery, keep_others);
+					}, this);
+				}
 				return this._subExecute(constrainedQuery.query, constrainedQuery.options).mapSuccess(function (iter) {
-					var result = iter.asArray();
-					this._complete = limit === null || result.length < limit;
-					this.replace_objects(result, keep_others);
+					if (!iter.hasNext()) {
+						this._complete = true;
+						return true;
+					}
+					if (!keep_others || !this._async) {
+						this.replace_objects(iter.asArray(), keep_others);
+						return true;
+					}
+					this.__executePromise = iter.asyncIterate(this.replace_object, this);
+					this.__executePromise.callback(function () {
+						this.__executePromise = null;
+					}, this);
 					return true;
 				}, this);
 			},
@@ -1035,7 +1057,7 @@ Scoped.define("module:Queries", [
 		},
 
 		dependencies: function (query) {
-			return Objs.keys(this.dependencies_query(query, {}));
+			return Object.keys(this.dependencies_query(query, {}));
 		},
 
 		dependencies_queries: function (queries, dep) {
@@ -1706,35 +1728,55 @@ Scoped.define("module:Stores.AssocStore", [
 
 Scoped.define("module:Stores.MemoryStore", [
                                             "module:Stores.AssocStore",
-                                            "base:Iterators.ObjectValuesIterator",
+                                            //"base:Iterators.ObjectValuesIterator",
+                                            "base:Iterators.FilteredIterator",
+                                            "base:Iterators.ArrayIterator",
                                             "base:Objs"
-                                            ], function (AssocStore, ObjectValuesIterator, Objs, scoped) {
+                                            ], function (AssocStore, FilteredIterator, ArrayIterator, Objs, scoped) {
 	return AssocStore.extend({scoped: scoped}, function (inherited) {			
 		return {
 
 			constructor: function (options) {
 				inherited.constructor.call(this, options);
-				this.__data = {};
+				// We reserve index 0.
+				this.__dataByIndex = [null];
+				this.__indexById = {};
+				this.__count = 0;
 			},
 
 			_read_key: function (key) {
-				return this.__data[key];
+				var i = this.__indexById[key];
+				return i ? this.__dataByIndex[i] : undefined;
 			},
 
 			_write_key: function (key, value) {
-				this.__data[key] = value;
+				var i = this.__indexById[key];
+				if (!i) {
+					i = this.__dataByIndex.length;
+					this.__indexById[key] = i;
+					this.__count++;
+				}
+				this.__dataByIndex[i] = value;
 			},
 
 			_remove_key: function (key) {
-				delete this.__data[key];
+				var i = this.__indexById[key];
+				if (i) {
+					delete this.__indexById[key];
+					delete this.__dataByIndex[i];
+					this.__count--;
+				}				
 			},
 
 			_iterate: function () {
-				return new ObjectValuesIterator(this.__data);
+				return new FilteredIterator(new ArrayIterator(this.__dataByIndex), function (item) {
+					return !!item;
+				});
+				//return new ObjectValuesIterator(this.__data);
 			},
 			
 			_count: function (query) {
-				return query ? inherited._count.call(this, query) : Objs.count(this.__data);
+				return query ? inherited._count.call(this, query) : this.__count;
 			}
 
 		};
@@ -2492,6 +2534,7 @@ Scoped.define("module:Stores.ReadyStore", [
 					stalling: stalling,
 					promise: promise
 				});
+				return stalling;
 			},
 
 			_preInsert: function () {
@@ -3706,17 +3749,20 @@ Scoped.define("module:Stores.CachedStore", [
 							this._options.queryKey, queryString,
 							this._options.queryMetaKey, meta
 						));
+						var promises = [];
 						Objs.iter(items, function (item) {
-							this.cacheInsertUpdate(item, {
+							promises.push(this.cacheInsertUpdate(item, {
 								lockItem: false,
 								lockAttrs: false,
 								silent: options.silent,
 								accessMeta: options.accessMeta,
 								refreshMeta: options.refreshMeta,
 								foreignKey: true
-							});
+							}));
 						}, this);
-						return new MappedIterator(new ArrayIterator(items), this.addItemSupp, this);
+						return Promise.and(promises).mapSuccess(function (items) {
+							return new MappedIterator(new ArrayIterator(items), this.addItemSupp, this);
+						}, this);
 					}, this).mapError(function () {
 						this.offline();
 						return this.itemCache.query(query, options).mapSuccess(function (items) {
@@ -3754,6 +3800,14 @@ Scoped.define("module:Stores.CachedStore", [
 
 			addItemSupp: function (data) {
 				return Objs.extend(Objs.clone(this._options.suppAttrs, 1), data);
+			},
+			
+			removeItemSupp: function (data) {
+				if (!this._options.suppAttrs)
+					return data;
+				return Objs.filter(data, function (value, key) {
+					return !(key in this._options.suppAttrs);
+				}, this);
 			},
 
 			addQueryMeta: function (data, meta) {
@@ -3927,33 +3981,41 @@ Scoped.define("module:Stores.PartialStore", [
                                             "module:Stores.BaseStore",
                                             "module:Stores.CachedStore",
                                             "module:Stores.PartialStoreWriteStrategies.PostWriteStrategy",
+                                            "module:Stores.PartialStoreWatcher",
                                             "base:Objs"
-                                            ], function (Store, CachedStore, PostWriteStrategy, Objs, scoped) {
+                                            ], function (Store, CachedStore, PostWriteStrategy, PartialStoreWatcher, Objs, scoped) {
 	return Store.extend({scoped: scoped}, function (inherited) {			
 		return {
 
 			constructor: function (remoteStore, options) {
 				inherited.constructor.call(this, options);
 				this._options = Objs.extend({}, options);
+				if (this._options.remoteWatcher)
+					this.remoteWatcher = this._options.remoteWatcher;
 				this.remoteStore = remoteStore;
 				this.cachedStore = new CachedStore(remoteStore, this._options);
 				this.writeStrategy = this._options.writeStrategy || this.auto_destroy(new PostWriteStrategy());
-				if (this._watcher) {
-					this._watcher.on("insert", this._remoteInsert, this);
-					this._watcher.on("update", this._remoteUpdate, this);
-					this._watcher.on("remove", this._remoteRemove, this);
+				if (this.remoteWatcher) {
+					this.remoteWatcher.on("insert", this._remoteInsert, this);
+					this.remoteWatcher.on("update", this._remoteUpdate, this);
+					this.remoteWatcher.on("remove", this._remoteRemove, this);
+					this._watcher = new PartialStoreWatcher(this);
 				}
 				this.cachedStore.on("insert", this._inserted, this);
 				this.cachedStore.on("remove", this._removed, this);
-				this.cachedStore.on("update", function (row, data) {
-					this._updated(this.cachedStore.id_of(row), data);
-				}, this);
+				this.cachedStore.on("update", this._updated, this);
 				this.writeStrategy.init(this);
 			},
 			
+			id_key: function () {
+				return this.cachedStore.id_key();
+			},
+			
 			destroy: function () {
+				if (this.remoteWatcher)
+					this.remoteWatcher.off(null, null, this);
 				if (this._watcher)
-					this._watcher.off(null, null, this);
+					this._watcher.destroy();
 				this.cachedStore.destroy();
 				inherited.destroy.call(this);
 			},
@@ -3983,11 +4045,12 @@ Scoped.define("module:Stores.PartialStore", [
 			},
 			
 			_remoteInsert: function (data) {
-				this.cachedStore.cacheInsert(data, {
+				this.cachedStore.cacheInsertUpdate(data, {
 					lockItem: false,
 					silent: false,
 					refreshMeta: true,
-					accessMeta: true
+					accessMeta: true,
+					foreignKey: true
 				});
 			},
 			
@@ -3998,19 +4061,56 @@ Scoped.define("module:Stores.PartialStore", [
 					lockAttrs: false,
 					silent: false,
 					accessMeta: true,
-					refreshMeta: true
+					refreshMeta: true,
+					foreignKey: true
 				});
 			},
 			
 			_remoteRemove: function (id) {
 				this.cachedStore.cacheRemove(id, {
 					ignoreLock: false,
-					silent: false
+					silent: false,
+					foreignKey: true
 				});
 			}
 
 		};
 	});	
+});
+
+
+Scoped.define("module:Stores.PartialStoreWatcher", [
+    "module:Stores.Watchers.LocalWatcher"                                                    
+], function (StoreWatcher, scoped) {
+	return StoreWatcher.extend({scoped: scoped}, function (inherited) {
+		return {
+			
+			_watchItem : function(id) {
+				inherited.watchItem.call(this, id);
+				this._store.cachedStore.cachedIdToRemoteId(id).success(function (remoteId) {
+					this._store.remoteWatcher.watchItem(remoteId, this);
+				}, this);
+			},
+
+			_unwatchItem : function(id) {
+				inherited.unwatchItem.call(this, id);
+				this._store.cachedStore.cachedIdToRemoteId(id).success(function (remoteId) {
+					this._store.remoteWatcher.unwatchItem(remoteId, this);
+				}, this);
+			},
+
+			_watchInsert : function(query) {
+				inherited.watchInsert.call(this, query);
+				this._store.remoteWatcher.watchInsert(query, this);
+			},
+
+			_unwatchInsert : function(query) {
+				inherited.unwatchInsert.call(this, query);
+				this._store.remoteWatcher.unwatchInsert(query, this);
+			}			
+			
+		};
+	});
 });
 Scoped.define("module:Stores.PartialStoreWriteStrategies.WriteStrategy", [
                                                                           "base:Class"
@@ -4080,8 +4180,9 @@ Scoped.define("module:Stores.PartialStoreWriteStrategies.PostWriteStrategy", [
 
 
 Scoped.define("module:Stores.PartialStoreWriteStrategies.PreWriteStrategy", [
-                                                                             "module:Stores.PartialStoreWriteStrategies.WriteStrategy"
-                                                                             ], function (Class, scoped) {
+    "module:Stores.PartialStoreWriteStrategies.WriteStrategy",
+    "base:Objs"
+], function (Class, Objs, scoped) {
 	return Class.extend({scoped: scoped}, function (inherited) {
 		return {
 
@@ -4091,12 +4192,15 @@ Scoped.define("module:Stores.PartialStoreWriteStrategies.PreWriteStrategy", [
 					silent: true,
 					refreshMeta: true,
 					accessMeta: true
-				}).success(function (data) {
-					this.partialStore.remoteStore.insert(data).success(function (remoteData) {
-						this.partialStore.cachedStore.cacheUpdate(this.partialStore.cachedStore.id_of(data), remoteData, {
+				}).mapSuccess(function (data) {
+					nosuppdata = this.partialStore.cachedStore.removeItemSupp(data);
+					return this.partialStore.remoteStore.insert(nosuppdata).mapSuccess(function (remoteData) {
+						return this.partialStore.cachedStore.cacheUpdate(this.partialStore.cachedStore.id_of(data), remoteData, {
 							silent: true,
 							unlockItem: true
-						});
+						}).mapSuccess(function (addedRemoteData) {
+							return Objs.extend(Objs.clone(data, 1), addedRemoteData);
+						}, this);
 					}, this).error(function () {
 						this.partialStore.cachedStore.cacheRemove(this.partialStore.cachedStore.id_of(data), {
 							ignoreLock: true,
@@ -4126,6 +4230,7 @@ Scoped.define("module:Stores.PartialStoreWriteStrategies.PreWriteStrategy", [
 						refreshMeta: false,
 						accessMeta: true
 					}).success(function (data) {
+						data = this.partialStore.cachedStore.removeItemSupp(data);
 						this.partialStore.remoteStore.update(remoteId, data).success(function () {
 							this.partialStore.cachedStore.unlockItem(cachedId);
 						}, this);
@@ -4185,6 +4290,7 @@ Scoped.define("module:Stores.PartialStoreWriteStrategies.CommitStrategy", [
 					refreshMeta: true,
 					accessMeta: true
 				}).success(function (data) {
+					data = this.partialStore.cachedStore.removeItemSupp(data);
 					this.storeHistory.sourceInsert(data);
 				}, this);
 			},
@@ -4208,6 +4314,7 @@ Scoped.define("module:Stores.PartialStoreWriteStrategies.CommitStrategy", [
 					refreshMeta: false,
 					accessMeta: true
 				}).success(function () {
+					data = this.partialStore.cachedStore.removeItemSupp(data);
 					this.storeHistory.sourceUpdate(id, data);
 				}, this);
 			},
@@ -4253,7 +4360,7 @@ Scoped.define("module:Stores.PartialStoreWriteStrategies.CommitStrategy", [
 								return this.partialStore.remoteStore.update(remoteId, commit.row);
 							}, this);
 						} else if (commit.type === "remove") {
-							return this.partialStore.remoteStore.remove(commit.row ? this.partialStore.remoteStore.id_of(commit.row) : commit.row_id);
+							promise = this.partialStore.remoteStore.remove(commit.row ? this.partialStore.remoteStore.id_of(commit.row) : commit.row_id);
 						}
 						promise.success(function (ret) {
 							hs.update(commit_id, {
@@ -4599,7 +4706,7 @@ Scoped.define("module:Stores.Watchers.PollWatcher", [
 						this._store.query({"$and": [keyQuery, query]}, options).success(function (result) {
 							while (result.hasNext()) {
 								var item = result.next();
-								var id = this._store.id_of(item);
+								var id = item[this.__increasingKey];
 								if (!this.__lastKeyIds[id])
 									this._insertedInsert(item);
 								this.__lastKeyIds[id] = true;
@@ -4702,8 +4809,7 @@ Scoped.define("module:Stores.Watchers.StoreWatcher", [
 			},
 
 			unwatchItem : function(id, context) {
-				if (this.__items.unregister(id, context))
-					this._unwatchItem(id);
+				this.__items.unregister(id, context).forEach(this._unwatchItem, this);
 			},
 
 			watchInsert : function(query, context) {
@@ -4712,8 +4818,7 @@ Scoped.define("module:Stores.Watchers.StoreWatcher", [
 			},
 
 			unwatchInsert : function(query, context) {
-				if (this.__inserts.unregister(query, context))
-					this._unwatchInsert(query);
+				this.__inserts.unregister(query, context).forEach(this._unwatchInsert, this);
 			},
 
 			_removedItem : function(id) {
@@ -4727,7 +4832,7 @@ Scoped.define("module:Stores.Watchers.StoreWatcher", [
 				var id = row[this.id_key];
 				if (!this.__items.get(id))
 					return;
-				this._updatedWatchedItem(id);
+				this._updatedWatchedItem(row, data);
 			},
 
 			_insertedInsert : function(data) {
@@ -5128,7 +5233,7 @@ Scoped.define("module:Modelling.Model", [
 					this.__silent++;
 					for (var key in data) {
 						if (!this._properties_changed[key])
-							this.set(key, data);
+							this.set(key, data[key]);
 					}
 					this.__silent--;
 				}, this);
