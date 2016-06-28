@@ -2,8 +2,9 @@ Scoped.define("module:Databases.MongoDatabaseTable", [
         "module:Databases.DatabaseTable",
         "base:Promise",
         "base:Objs",
+        "base:Types",
         "base:Iterators.ArrayIterator"
-    ], function (DatabaseTable, Promise, Objs, ArrayIterator, scoped) {
+    ], function (DatabaseTable, Promise, Objs, Types, ArrayIterator, scoped) {
     return DatabaseTable.extend({scoped: scoped}, {
 		
 		table: function () {
@@ -21,7 +22,7 @@ Scoped.define("module:Databases.MongoDatabaseTable", [
 				delete obj.id;
 				if (data.id !== null) {
 		            var objid = this._database.mongo_object_id();
-		            obj._id = new objid(data.id + "");
+		            obj._id = Types.is_object(data.id) ? data.id : new objid(data.id + "");
 				}
 			}
 			return obj;
