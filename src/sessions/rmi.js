@@ -1,10 +1,11 @@
 
 Scoped.define("module:Sessions.RMIHelper", [      
          "base:Class",
+         "base:Channels.ReadySender",
          "base:Net.SocketSenderChannel",
          "base:Net.SocketReceiverChannel",
          "base:RMI.Peer"
-     ], function (Class, SocketSenderChannel, SocketReceiverChannel, Peer, scoped) {
+     ], function (Class, ReadySender, SocketSenderChannel, SocketReceiverChannel, Peer, scoped) {
      return Class.extend({scoped: scoped}, function (inherited) {
      	return {
 		
@@ -12,7 +13,7 @@ Scoped.define("module:Sessions.RMIHelper", [
 		    	inherited.constructor.call(this);
 		        this.__active_session = active_session;
 		        active_session.rmi = this;
-		        this.__rmi_sender = new SocketSenderChannel(null, "rmi", false);
+		        this.__rmi_sender = new ReadySender(new SocketSenderChannel(null, "rmi"));
 		        this.__rmi_receiver = new SocketReceiverChannel(null, "rmi");
 		        this.__rmi_peer = new Peer(this.__rmi_sender, this.__rmi_receiver);
 		        active_session.rmi_peer = this.__rmi_peer;

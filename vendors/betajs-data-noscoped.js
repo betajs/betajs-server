@@ -1,5 +1,5 @@
 /*!
-betajs-data - v1.0.26 - 2016-03-27
+betajs-data - v1.0.34 - 2016-07-06
 Copyright (c) Oliver Friedmann
 Apache-2.0 Software License.
 */
@@ -8,15 +8,13 @@ Apache-2.0 Software License.
 var Scoped = this.subScope();
 Scoped.binding('module', 'global:BetaJS.Data');
 Scoped.binding('base', 'global:BetaJS');
-Scoped.binding('jquery', 'global:jQuery');
-Scoped.binding('resumablejs', 'global:Resumable');
 Scoped.define("module:", function () {
 	return {
     "guid": "70ed7146-bb6d-4da4-97dc-5a8e2d23a23f",
-    "version": "77.1459096749119"
+    "version": "85.1467803530201"
 };
 });
-Scoped.assumeVersion('base:version', 474);
+Scoped.assumeVersion('base:version', 501);
 /**
  * @class AbstractQueryCollection
  *
@@ -611,8 +609,9 @@ Scoped.define("module:Stores.AbstractIndex", [
 Scoped.define("module:Stores.MemoryIndex", [
                                             "module:Stores.AbstractIndex",
                                             "base:Structures.TreeMap",
-                                            "base:Objs"
-                                            ], function (AbstractIndex, TreeMap, Objs, scoped) {
+                                            "base:Objs",
+                                            "base:Types"
+                                            ], function (AbstractIndex, TreeMap, Objs, Types, scoped) {
 	return AbstractIndex.extend({scoped: scoped}, function (inherited) {
 		return {
 
@@ -644,7 +643,7 @@ Scoped.define("module:Stores.MemoryIndex", [
 			__remove: function (key, map, id) {
 				var value = TreeMap.find(key, map);
 				delete value[id];
-				if (Objs.is_empty(value))
+				if (Types.is_empty(value))
 					map = TreeMap.remove(key, map);
 				return map;
 			},
@@ -1262,11 +1261,12 @@ Scoped.define("module:Queries", [
 					}, this);
 					if ((key === "$and" && arr.length > 0) || (key === "$or" && !had_true))
 						result[key] = arr;
-				} else {
+				} else if (Types.is_object(value)) {
 					var conds = this.simplifyConditions(value);
 					if (!Types.is_empty(conds))
 						result[key] = conds;
-				}
+				} else
+					result[key] = value;
 			}, this);
 			return result;
 		},
@@ -1542,10 +1542,11 @@ Scoped.define("module:Queries.Engine", [
 					}
 					var add = ignoreCase ? "ic" : "";
 					var postfix = ignoreCase ? "_ic" : "";
-					if (conds["$eq" + add]) {
+					if (conds["$eq" + add] || !Types.is_object(conds)) {
 						var materialized = [];
-						index["itemIterate" + postfix](conds["$eq" + add], primarySortDirection, function (dataKey, data) {
-							if (dataKey !== conds["$eq" + add])
+						var value = Types.is_object(conds) ? conds["$eq" + add] : conds;
+						index["itemIterate" + postfix](value, primarySortDirection, function (dataKey, data) {
+							if (dataKey !== value)
 								return false;
 							materialized.push(data);
 						});
@@ -1581,6 +1582,7 @@ Scoped.define("module:Queries.Engine", [
 								if (Math.sign((index.comparator())(currentKey, lastKey)) === Math.sign(primarySortDirection))
 									return null;
 							}
+							var materialized = [];
 							index["itemIterate" + postfix](currentKey, primarySortDirection, function (dataKey, data) {
 								if (currentKey === null)
 									currentKey = dataKey;
@@ -1724,15 +1726,57 @@ Scoped.define("module:Stores.AssocStore", [
 	});
 });
 
+//Stores everything temporarily in the browser's memory using map
+
+Scoped.define("module:Stores.MemoryMapStore", [
+    "module:Stores.AssocStore",
+    "base:Iterators.FilteredIterator",
+    "base:Iterators.NativeMapIterator",
+    "base:Objs"
+], function (AssocStore, FilteredIterator, NativeMapIterator, Objs, scoped) {
+	return AssocStore.extend({scoped: scoped}, function (inherited) {			
+		return {
+
+			constructor: function (options) {
+				inherited.constructor.call(this, options);
+				this.__map = new Map();
+			},
+
+			_read_key: function (key) {
+				return this.__map.get(key + "");
+			},
+
+			_write_key: function (key, value) {
+				this.__map.set(key + "", value);
+			},
+
+			_remove_key: function (key) {
+				this.__map['delete'](key + "");
+			},
+
+			_iterate: function () {
+				return new FilteredIterator(new NativeMapIterator(this.__map), function (item) {
+					return !!item;
+				});
+			},
+			
+			_count: function (query) {
+				return query ? inherited._count.call(this, query) : this.__map.size;
+			}						
+
+		};
+	});
+});
+
 //Stores everything temporarily in the browser's memory
 
 Scoped.define("module:Stores.MemoryStore", [
-                                            "module:Stores.AssocStore",
-                                            //"base:Iterators.ObjectValuesIterator",
-                                            "base:Iterators.FilteredIterator",
-                                            "base:Iterators.ArrayIterator",
-                                            "base:Objs"
-                                            ], function (AssocStore, FilteredIterator, ArrayIterator, Objs, scoped) {
+    "module:Stores.AssocStore",
+    //"base:Iterators.ObjectValuesIterator",
+    "base:Iterators.FilteredIterator",
+    "base:Iterators.ArrayIterator",
+    "base:Objs"
+], function (AssocStore, FilteredIterator, ArrayIterator, Objs, scoped) {
 	return AssocStore.extend({scoped: scoped}, function (inherited) {			
 		return {
 
@@ -1789,8 +1833,9 @@ Scoped.define("module:Stores.BaseStore", [
   "module:Stores.ReadStoreMixin",
   "module:Stores.WriteStoreMixin",
   "base:Promise",
-  "base:Objs"
-], function (Class, EventsMixin, ReadStoreMixin, WriteStoreMixin, Promise, Objs, scoped) {
+  "base:Objs",
+  "module:Stores.MemoryIndex"
+], function (Class, EventsMixin, ReadStoreMixin, WriteStoreMixin, Promise, Objs, MemoryIndex, scoped) {
 	return Class.extend({scoped: scoped}, [EventsMixin, ReadStoreMixin, WriteStoreMixin, function (inherited) {			
 		return {
 
@@ -1801,7 +1846,9 @@ Scoped.define("module:Stores.BaseStore", [
 			},
 
 			_ensure_index: function (key) {
-			},
+				if (!(key in this.indices))
+					this.indices[key] = new MemoryIndex(this, key);
+			},	
 
 			ensure_index: function (key) {
 				return this._ensure_index(key);
@@ -1892,6 +1939,12 @@ Scoped.define("module:Stores.ReadStoreMixin", [
 					},
 					this,
 					this.indices);
+		},
+		
+		serialize: function (ctx) {
+			return this.query({}, {}, ctx).mapSuccess(function (iter) {
+				return iter.asArray();
+			});
 		}
 
 	};
@@ -2111,6 +2164,10 @@ Scoped.define("module:Stores.WriteStoreMixin", [
 			return this._update(id, data, ctx).success(function (row) {
 				this._updated(row, data, ctx);
 			}, this);
+		},
+		
+		unserialize: function (arr, ctx) {
+			return this.insert_all(arr, ctx);
 		}
 
 	};
@@ -2140,6 +2197,70 @@ Scoped.define("module:Stores.WriteStore", [
 		};
 	}]);
 });
+
+
+Scoped.define("module:Stores.AsyncStore", [
+                                                 "module:Stores.BaseStore",
+                                                 "base:Promise",
+                                                 "base:Async"
+                                                 ], function (BaseStore, Promise, Async, scoped) {
+	return BaseStore.extend({scoped: scoped}, function (inherited) {			
+		return {
+
+			constructor: function (store, options) {
+				this.__store = store;
+				options = options || {};
+				options.id_key = store.id_key();
+				inherited.constructor.call(this, options);
+				this.__time = options.time || 0;
+				if (options.destroy_store)
+					this._auto_destroy(store);
+			},
+
+			_query_capabilities: function () {
+				return this.__store._query_capabilities();
+			},
+			
+			__async: function (f, args) {
+				var promise = Promise.create();
+				Async.eventually(function () {
+					f.apply(this.__store, args).forwardCallback(promise);
+				}, this, this.__time);
+				return promise;
+			},
+
+			_insert: function () {
+				return this.__async(this.__store.insert, arguments);
+			},
+
+			_remove: function () {
+				return this.__async(this.__store.remove, arguments);
+			},
+
+			_get: function () {
+				return this.__async(this.__store.get, arguments);
+			},
+
+			_update: function () {
+				return this.__async(this.__store.update, arguments);
+			},
+
+			_query: function () {
+				return this.__async(this.__store.query, arguments);
+			},
+
+			_ensure_index: function (key) {
+				return this.__store.ensure_index(key);
+			},
+
+			_store: function () {
+				return this.__store;
+			}
+
+		};
+	});
+});
+
 
 Scoped.define("module:Stores.ContextualizedStore", [
                                                  "module:Stores.BaseStore",
@@ -2408,6 +2529,7 @@ Scoped.define("module:Stores.PassthroughStore", [
 				inherited.constructor.call(this, options);
 				if (options.destroy_store)
 					this._auto_destroy(store);
+				this.delegateEvents(["insert", "update", "remove"], this.__store);
 			},
 
 			_query_capabilities: function () {
@@ -2454,6 +2576,22 @@ Scoped.define("module:Stores.PassthroughStore", [
 				}, this);
 			},
 
+			unserialize: function (data) {
+				return this._preUnserialize(data).mapSuccess(function (data) {
+					return this.__store.unserialize(data).mapSuccess(function (data) {
+						return this._postUnserialize(data);
+					}, this);
+				}, this);
+			},
+
+			serialize: function (data) {
+				return this._preSerialize(data).mapSuccess(function (data) {
+					return this.__store.serialize(data).mapSuccess(function (data) {
+						return this._postSerialize(data);
+					}, this);
+				}, this);
+			},
+
 			_ensure_index: function (key) {
 				return this.__store.ensure_index(key);
 			},
@@ -2463,44 +2601,60 @@ Scoped.define("module:Stores.PassthroughStore", [
 			},
 
 			_preInsert: function (data) {
-				return Promise.create(data);
+				return Promise.value(data);
 			},
 			
 			_postInsert: function (data) {
-				return Promise.create(data);
+				return Promise.value(data);
 			},
 			
 			_preRemove: function (id) {
-				return Promise.create(id);
+				return Promise.value(id);
 			},
 			
 			_postRemove: function (id) {
-				return Promise.create(true);
+				return Promise.value(true);
 			},
 			
 			_preGet: function (id) {
-				return Promise.create(id);
+				return Promise.value(id);
 			},
 			
 			_postGet: function (data) {
-				return Promise.create(data);
+				return Promise.value(data);
 			},
 
 			_preUpdate: function (id, data) {
-				return Promise.create({id: id, data: data});
+				return Promise.value({id: id, data: data});
 			},
 			
 			_postUpdate: function (row) {
-				return Promise.create(row);
+				return Promise.value(row);
 			},
 			
 			_preQuery: function (query, options) {
-				return Promise.create({query: query, options: options});
+				return Promise.value({query: query, options: options});
 			},
 			
 			_postQuery: function (results) {
-				return Promise.create(results);
-			}
+				return Promise.value(results);
+			},
+			
+			_preSerialize: function (data) {
+				return Promise.value(data);
+			},
+			
+			_postSerialize: function (data) {
+				return Promise.value(data);
+			},
+			
+			_preUnserialize: function (data) {
+				return Promise.value(data);
+			},
+			
+			_postUnserialize: function (data) {
+				return Promise.value(data);
+			}			
 
 		};
 	});
@@ -2515,7 +2669,6 @@ Scoped.define("module:Stores.ReadyStore", [
 	return PassthroughStore.extend({scoped: scoped}, function (inherited) {			
 		return {
 			
-			__promises: [],
 			__ready: false,
 			
 			ready: function () {
@@ -2523,13 +2676,14 @@ Scoped.define("module:Stores.ReadyStore", [
 				Objs.iter(this.__promises, function (rec) {
 					rec.promise.forwardCallback(rec.stalling);
 				});
-				this.__promises = [];
+				delete this.__promises;
 			},
 			
 			__execute: function (promise) {
 				if (this.__ready)
 					return promise;
 				var stalling = Promise.create();
+				this.__promises = this.__promises || [];
 				this.__promises.push({
 					stalling: stalling,
 					promise: promise
@@ -2555,6 +2709,14 @@ Scoped.define("module:Stores.ReadyStore", [
 			
 			_preQuery: function () {
 				return this.__execute(inherited._preQuery.apply(this, arguments));
+			},
+			
+			_preSerialize: function () {
+				return this.__execute(inherited._preSerialize.apply(this, arguments));
+			},
+			
+			_preUnserialize: function () {
+				return this.__execute(inherited._preUnserialize.apply(this, arguments));
 			}
 			
 		};
@@ -3451,7 +3613,8 @@ Scoped.define("module:Stores.CachedStore", [
 					queryMetaKey: "meta",
 					queryKey: "query",
 					cacheKey: null,
-					suppAttrs: {}
+					suppAttrs: {},
+					optimisticRead: false
 				}, options);
 				this._online = true;
 				this.itemCache = this._options.itemCache || this.auto_destroy(new MemoryStore({
@@ -3691,6 +3854,22 @@ Scoped.define("module:Stores.CachedStore", [
 					}, this);
 				}, this);
 			},
+			
+			__itemCacheQuery: function (query, options) {
+				return this.itemCache.query(query, options).mapSuccess(function (items) {
+					items = items.asArray();
+					Objs.iter(items, function (item) {
+						this.cacheUpdate(this.itemCache.id_of(item), {}, {
+							lockItem: false,
+							lockAttrs: false,
+							silent: true,
+							accessMeta: options.accessMeta,
+							refreshMeta: false
+						});
+					}, this);
+					return new MappedIterator(new ArrayIterator(items), this.removeItemMeta, this);
+				}, this);
+			},
 
 			/*
 			 * options:
@@ -3719,26 +3898,14 @@ Scoped.define("module:Stores.CachedStore", [
 								meta.accessMeta = this.cacheStrategy.queryAccessMeta(meta.accessMeta);
 								this.queryCache.update(query_id, this.addQueryMeta({}, meta));
 							}
-							return this.itemCache.query(query, options).mapSuccess(function (items) {
-								items = items.asArray();
-								Objs.iter(items, function (item) {
-									this.cacheUpdate(this.itemCache.id_of(item), {}, {
-										lockItem: false,
-										lockAttrs: false,
-										silent: true,
-										accessMeta: options.accessMeta,
-										refreshMeta: false
-									});
-								}, this);
-								return new MappedIterator(new ArrayIterator(items), this.removeItemMeta, this);
-							}, this);
+							return this.__itemCacheQuery(query, options);
 						}
 						this.queryCache.remove(query_id);
 					}
 					// Note: This is probably not good enough in the most general cases.
 					if (Queries.queryDeterminedByAttrs(query, this._options.suppAttrs))
 						return this.itemCache.query(query, options);
-					return this.remoteStore.query(query, queryOptions).mapSuccess(function (items) {
+					var remotePromise = this.remoteStore.query(query, queryOptions).mapSuccess(function (items) {
 						this.online();
 						items = items.asArray();
 						var meta = {
@@ -3754,7 +3921,7 @@ Scoped.define("module:Stores.CachedStore", [
 							promises.push(this.cacheInsertUpdate(item, {
 								lockItem: false,
 								lockAttrs: false,
-								silent: options.silent,
+								silent: options.silent && !this._options.optimisticRead,
 								accessMeta: options.accessMeta,
 								refreshMeta: options.refreshMeta,
 								foreignKey: true
@@ -3765,20 +3932,11 @@ Scoped.define("module:Stores.CachedStore", [
 						}, this);
 					}, this).mapError(function () {
 						this.offline();
-						return this.itemCache.query(query, options).mapSuccess(function (items) {
-							items = items.asArray();
-							Objs.iter(items, function (item) {
-								this.cacheUpdate(this.itemCache.id_of(item), {}, {
-									lockItem: false,
-									lockAttrs: false,
-									silent: true,
-									accessMeta: options.accessMeta,
-									refreshMeta: false
-								});
-							}, this);
-							return new MappedIterator(new ArrayIterator(items), this.removeItemMeta, this);
-						}, this);
+						if (!this._options.optimisticRead) {
+							return this.__itemCacheQuery(query, options);
+						}
 					}, this);
+					return this._options.optimisticRead ? this.__itemCacheQuery(query, options) : remotePromise;
 				}, this);
 			},
 
@@ -3874,6 +4032,26 @@ Scoped.define("module:Stores.CachedStore", [
 					return Promise.value(cachedId);
 				return this.itemCache.get(cachedId).mapSuccess(function (item) {
 					return item ? this.remoteStore.id_of(item) : null;
+				}, this);
+			},
+			
+			serialize: function () {
+				return this.itemCache.serialize().mapSuccess(function (itemCacheSerialized) {
+					return this.queryCache.serialize().mapSuccess(function (queryCacheSerialized) {
+						return {
+							items: itemCacheSerialized,
+							queries: queryCacheSerialized
+						};
+					}, this);
+				}, this);
+			},
+			
+			unserialize: function (data) {
+				return this.itemCache.unserialize(data.items).mapSuccess(function (items) {
+					this.queryCache.unserialize(data.queries);
+					return items.map(function (item) {
+						return this.removeItemMeta(item);
+					}, this);
 				}, this);
 			}
 
@@ -4072,6 +4250,18 @@ Scoped.define("module:Stores.PartialStore", [
 					silent: false,
 					foreignKey: true
 				});
+			},
+			
+			serialize: function () {
+				return this.cachedStore.serialize();
+			},
+			
+			unserialize: function (data) {
+				return this.cachedStore.unserialize(data).success(function (items) {
+					items.forEach(function (item) {
+						this._inserted(item);
+					}, this);
+				}, this);
 			}
 
 		};
@@ -4703,7 +4893,7 @@ Scoped.define("module:Stores.Watchers.PollWatcher", [
 						var query = q.query;
 						var options = q.options;
 						var keyQuery = Objs.objectBy(this.__increasingKey, {"$gte": this.__lastKey});
-						this._store.query({"$and": [keyQuery, query]}, options).success(function (result) {
+						this._store.query(Objs.extend(keyQuery, query), options).success(function (result) {
 							while (result.hasNext()) {
 								var item = result.next();
 								var id = item[this.__increasingKey];
@@ -4824,7 +5014,8 @@ Scoped.define("module:Stores.Watchers.StoreWatcher", [
 			_removedItem : function(id) {
 				if (!this.__items.get(id))
 					return;
-				//this.unwatchItem(id, null);
+				// @Oliver: I am not sure why this is commented out, but tests fail if we comment it in.
+				// this.unwatchItem(id, null);
 				this._removedWatchedItem(id);
 			},
 
@@ -5176,8 +5367,9 @@ Scoped.define("module:Modelling.Model", [
                                          "base:Objs",
                                          "base:Promise",
                                          "base:Types",
-                                         "base:Exceptions"
-                                         ], function (AssociatedProperties, ModelInvalidException, Objs, Promise, Types, Exceptions, scoped) {
+                                         "base:Exceptions",
+                                         "module:Modelling.Table"
+                                         ], function (AssociatedProperties, ModelInvalidException, Objs, Promise, Types, Exceptions, Table, scoped) {
 	return AssociatedProperties.extend({scoped: scoped}, function (inherited) {			
 		return {
 
@@ -5281,6 +5473,8 @@ Scoped.define("module:Modelling.Model", [
 					var wasNew = this.isNew();
 					var promise = this.isNew() ? this.__table.store().insert(attrs, this.__ctx) : this.__table.store().update(this.id(), attrs, this.__ctx);
 					return promise.mapCallback(function (err, result) {
+						if (this.destroyed())
+							return this;
 						if (err) {
 							if (err.data) {
 								Objs.iter(err.data, function (value, key) {
@@ -5306,14 +5500,19 @@ Scoped.define("module:Modelling.Model", [
 			remove: function () {
 				if (this.isNew() || this.isRemoved())
 					return Promise.create(true);
-				return this.__table.store().remove(this.id(), this.__ctx).mapSuccess(function (result) {
-					this.trigger("remove");		
+				return this.__table.store().remove(this.id(), this.__ctx).success(function () {
 					this.__options.removed = true;
-					return result;
+					this.trigger("remove");		
 				}, this);
 			}	
 
 		};
+	}, {
+		
+		createTable: function (store, options) {
+			return new Table(store, this, options);
+		}
+
 	});
 });
 Scoped.define("module:Modelling.SchemedProperties", [
@@ -5594,8 +5793,9 @@ Scoped.define("module:Modelling.Table", [
                                          "base:Events.EventsMixin",
                                          "base:Objs",
                                          "base:Types",
-                                         "base:Iterators.MappedIterator"
-                                         ], function (Class, EventsMixin, Objs, Types, MappedIterator, scoped) {
+                                         "base:Iterators.MappedIterator",
+                                         "base:Classes.ObjectCache"
+                                         ], function (Class, EventsMixin, Objs, Types, MappedIterator, ObjectCache, scoped) {
 	return Class.extend({scoped: scoped}, [EventsMixin, function (inherited) {			
 		return {
 
@@ -5611,7 +5811,9 @@ Scoped.define("module:Modelling.Table", [
 					// Update options
 					auto_update: true,
 					// Save invalid
-					save_invalid: false
+					save_invalid: false,
+					// Cache Models
+					cache_models: false
 				}, options || {});
 				this.__store.on("insert", function (obj) {
 					this.trigger("create", obj);
@@ -5625,6 +5827,11 @@ Scoped.define("module:Modelling.Table", [
 					this.trigger("remove", id);
 					this.trigger("remove:" + id);
 				}, this);
+				if (this.__options.cache_models) {
+					this.model_cache = this.auto_destroy(new ObjectCache(function (model) {
+						return model.id();
+					}));
+				}
 			},
 
 			modelClass: function (cls) {
@@ -5637,6 +5844,15 @@ Scoped.define("module:Modelling.Table", [
 				var model = new cls(attributes, this, {}, ctx);
 				if (this.__options.auto_create)
 					model.save();
+				if (this.model_cache) {
+					if (model.hasId())
+						this.model_cache.register(model);
+					else {
+						model.once("save", function () {
+							this.model_cache.register(model);
+						}, this);
+					}
+				}
 				return model;
 			},
 
@@ -5644,7 +5860,17 @@ Scoped.define("module:Modelling.Table", [
 				if (!obj)
 					return null;
 				var cls = this.modelClass(this.__options.type_column && obj[this.__options.type_column] ? this.__options.type_column : null);
-				return new cls(obj, this, {newModel: false}, ctx);
+				if (this.model_cache) {
+					var cachedModel = this.model_cache.get(obj[this.primary_key()]);
+					if (cachedModel) {
+						cachedModel.setAll(obj);
+						return cachedModel;
+					}
+				}
+				var model = new cls(obj, this, {newModel: false}, ctx);
+				if (this.model_cache)
+					this.model_cache.register(model);
+				return model;
 			},
 
 			options: function () {

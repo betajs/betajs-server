@@ -1,5 +1,5 @@
 /*!
-betajs-server - v1.0.8 - 2016-06-27
+betajs-server - v1.0.9 - 2016-07-07
 Copyright (c) Oliver Friedmann
 Apache-2.0 Software License.
 */
@@ -12,7 +12,7 @@ Scoped.binding('data', 'global:BetaJS.Data');
 Scoped.define("module:", function () {
 	return {
     "guid": "9955100d-6a88-451f-9a85-004523eb8589",
-    "version": "35.1467081522103"
+    "version": "36.1467902124913"
 };
 });
 Scoped.assumeVersion('base:version', 444);
@@ -754,10 +754,11 @@ Scoped.define("module:Sessions.PersistentSessionManagerHelper", [
 
 Scoped.define("module:Sessions.RMIHelper", [      
          "base:Class",
+         "base:Channels.ReadySender",
          "base:Net.SocketSenderChannel",
          "base:Net.SocketReceiverChannel",
          "base:RMI.Peer"
-     ], function (Class, SocketSenderChannel, SocketReceiverChannel, Peer, scoped) {
+     ], function (Class, ReadySender, SocketSenderChannel, SocketReceiverChannel, Peer, scoped) {
      return Class.extend({scoped: scoped}, function (inherited) {
      	return {
 		
@@ -765,7 +766,7 @@ Scoped.define("module:Sessions.RMIHelper", [
 		    	inherited.constructor.call(this);
 		        this.__active_session = active_session;
 		        active_session.rmi = this;
-		        this.__rmi_sender = new SocketSenderChannel(null, "rmi", false);
+		        this.__rmi_sender = new ReadySender(new SocketSenderChannel(null, "rmi"));
 		        this.__rmi_receiver = new SocketReceiverChannel(null, "rmi");
 		        this.__rmi_peer = new Peer(this.__rmi_sender, this.__rmi_receiver);
 		        active_session.rmi_peer = this.__rmi_peer;
