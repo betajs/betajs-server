@@ -1,5 +1,5 @@
 /*!
-betajs-server - v1.0.9 - 2016-07-07
+betajs-server - v1.0.9 - 2016-08-04
 Copyright (c) Oliver Friedmann
 Apache-2.0 Software License.
 */
@@ -12,7 +12,7 @@ Scoped.binding('data', 'global:BetaJS.Data');
 Scoped.define("module:", function () {
 	return {
     "guid": "9955100d-6a88-451f-9a85-004523eb8589",
-    "version": "36.1467902124913"
+    "version": "37.1470287917100"
 };
 });
 Scoped.assumeVersion('base:version', 444);
@@ -278,72 +278,62 @@ Scoped.define("module:Databases.MongoDatabaseTable", [
 });
 
 Scoped.define("module:Net.HttpAjax", [      
-        "base:Net.AbstractAjax",
+        "base:Net.Ajax",
         "base:Promise",
         "base:Net.Uri"
-    ], function (AbstractAjax, Promise, Uri, scoped) {
-    return AbstractAjax.extend({scoped: scoped}, function (inherited) {
-		return {
-			
-			_asyncCall: function (options) {
-				var parsed = Uri.parse(options.uri);
-				var opts = {
-					method: options.method,
-					host: parsed.host,
-					port: parsed.port,
-					path: parsed.path
-				};		
-				var post_data = null;
-				if (options.data) {
-					if (opts.method == "GET") {
-						opts.path = opts.path + "?" + this.cls.querystring().stringify(options.data);
-					} else {
-						post_data = this.cls.querystring().stringify(options.data);
-						if (post_data.length > 0)
-							opts.headers = {
-					          'Content-Type': 'application/x-www-form-urlencoded',
-					          'Content-Length': post_data.length
-						    };
-					}			
-				}
-				var promise = Promise.create();
-				var request = this.cls.http().request(opts, function (result) {
-					var data = "";
-					result.on("data", function (chunk) {
-						data += chunk;
-					}).on("end", function () {
-						if (result.statusCode >= 200 && result.statusCode < 300)
-							promise.asyncSuccess(data);
-						else
-							promise.asyncError(data);
-					});
-				});
-				if (post_data && post_data.length > 0)
-					request.write(post_data);
-				request.end();
-				return promise;
-			}
+    ], function (Ajax, Promise, Uri, scoped) {
+    var Cls = Ajax.extend({scoped: scoped}, {
 		
-		};
+		_asyncCall: function (options) {
+			var parsed = Uri.parse(options.uri);
+			var opts = {
+				method: options.method,
+				host: parsed.host,
+				port: parsed.port,
+				path: parsed.path
+			};		
+			var post_data = null;
+			if (options.data) {
+				if (opts.method == "GET") {
+					opts.path = opts.path + "?" + require("querystring").stringify(options.data);
+				} else {
+					post_data = require("querystring").stringify(options.data);
+					if (post_data.length > 0)
+						opts.headers = {
+				          'Content-Type': 'application/x-www-form-urlencoded',
+				          'Content-Length': post_data.length
+					    };
+				}			
+			}
+			var promise = Promise.create();
+			var request = require("http").request(opts, function (result) {
+				var data = "";
+				result.on("data", function (chunk) {
+					data += chunk;
+				}).on("end", function () {
+					if (result.statusCode >= 200 && result.statusCode < 300)
+						promise.asyncSuccess(data);
+					else
+						promise.asyncError(data);
+				});
+			});
+			if (post_data && post_data.length > 0)
+				request.write(post_data);
+			request.end();
+			return promise;
+		}
+	
     }, {
 		
-		__http: null,
-		
-		http: function () {
-			if (!this.__http)
-				this.__http = require("http");
-			return this.__http;
-		},	
-		
-		__querystring: null,
-		
-		querystring: function () {
-			if (!this.__querystring)
-				this.__querystring = require("querystring");
-			return this.__querystring;
-		}	
+		supported: function (options) {
+			return true;
+		}
 	
 	});
+    
+    Ajax.register(Cls, 1);
+    
+    return Cls;
 });
 Scoped.define("module:Net.ControllerException", [      
         "base:Exceptions.Exception",
