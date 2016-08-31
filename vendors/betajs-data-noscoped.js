@@ -1,5 +1,5 @@
 /*!
-betajs-data - v1.0.38 - 2016-08-02
+betajs-data - v1.0.38 - 2016-08-04
 Copyright (c) Oliver Friedmann
 Apache-2.0 Software License.
 */
@@ -11,7 +11,7 @@ Scoped.binding('base', 'global:BetaJS');
 Scoped.define("module:", function () {
 	return {
     "guid": "70ed7146-bb6d-4da4-97dc-5a8e2d23a23f",
-    "version": "89.1470187600277"
+    "version": "89.1470287577683"
 };
 });
 Scoped.assumeVersion('base:version', 526);
@@ -5411,9 +5411,8 @@ Scoped.define("module:Modelling.Model", [
                                          "base:Objs",
                                          "base:Promise",
                                          "base:Types",
-                                         "base:Exceptions",
                                          "module:Modelling.Table"
-                                         ], function (AssociatedProperties, ModelInvalidException, Objs, Promise, Types, Exceptions, Table, scoped) {
+                                         ], function (AssociatedProperties, ModelInvalidException, Objs, Promise, Types, Table, scoped) {
 	return AssociatedProperties.extend({scoped: scoped}, function (inherited) {			
 		return {
 
@@ -5525,7 +5524,7 @@ Scoped.define("module:Modelling.Model", [
 									this.setError(key, value);
 								}, this);
 							}
-							return Exceptions.ensure(new ModelInvalidException(this, err));
+							return new ModelInvalidException(this, err);
 						}
 						this.__silent++;
 						this.setAll(result);
