@@ -1,4 +1,4 @@
-# betajs-server 1.0.11
+# betajs-server 1.0.12
 [![Code Climate](https://codeclimate.com/github/betajs/betajs-server/badges/gpa.svg)](https://codeclimate.com/github/betajs/betajs-server)
 
 

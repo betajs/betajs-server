@@ -1,5 +1,5 @@
 /*!
-betajs-data - v1.0.38 - 2016-08-04
+betajs-data - v1.0.39 - 2016-09-27
 Copyright (c) Oliver Friedmann
 Apache-2.0 Software License.
 */
@@ -11,7 +11,7 @@ Scoped.binding('base', 'global:BetaJS');
 Scoped.define("module:", function () {
 	return {
     "guid": "70ed7146-bb6d-4da4-97dc-5a8e2d23a23f",
-    "version": "89.1470287577683"
+    "version": "90.1474977796066"
 };
 });
 Scoped.assumeVersion('base:version', 526);
@@ -3260,7 +3260,7 @@ Scoped.define("module:Stores.Invokers.RestInvokeeAjaxInvoker", [
 			},
 			
 			restInvoke: function (method, uri, post, get) {
-				return this.__ajax.asyncCall({
+				return this.__ajax.execute({
 					method: method,
 					data: post,
 					uri: Uri.appendUriParams(uri, get)
