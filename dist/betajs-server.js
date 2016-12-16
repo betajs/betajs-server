@@ -1,5 +1,5 @@
 /*!
-betajs-server - v1.0.12 - 2016-09-27
+betajs-server - v1.0.13 - 2016-12-15
 Copyright (c) Oliver Friedmann
 Apache-2.0 Software License.
 */
@@ -996,7 +996,7 @@ Public.exports();
 	return Public;
 }).call(this);
 /*!
-betajs-server - v1.0.12 - 2016-09-27
+betajs-server - v1.0.13 - 2016-12-15
 Copyright (c) Oliver Friedmann
 Apache-2.0 Software License.
 */
@@ -1009,7 +1009,7 @@ Scoped.binding('data', 'global:BetaJS.Data');
 Scoped.define("module:", function () {
 	return {
     "guid": "9955100d-6a88-451f-9a85-004523eb8589",
-    "version": "39.1475008089625"
+    "version": "40.1481839383720"
 };
 });
 Scoped.assumeVersion('base:version', 444);
@@ -1133,6 +1133,10 @@ Scoped.define("module:Databases.DatabaseTable", [
 				return this.findOne({id : id});
 			},
 			
+			count: function (query) {
+				return this._count(this._encode(query));
+			},
+			
 			_insertRow: function (row) {		
 			},
 			
@@ -1140,6 +1144,9 @@ Scoped.define("module:Databases.DatabaseTable", [
 			},
 			
 			_updateRow: function (query, row) {
+			},
+			
+			_count: function (query) {				
 			},
 			
 			insertRow: function (row) {
@@ -1310,6 +1317,14 @@ Scoped.define("module:Databases.MongoDatabaseTable", [
 					}, this);
 				}, this);
 			}, this);
+		},
+		
+		_count: function (query) {
+			return this.table().mapSuccess(function (table) {
+				return Promise.funcCallback(table, table.find, query).mapSuccess(function (result) {
+					return Promise.funcCallback(result, result.count);
+				});
+			});
 		},
 	
 		_insertRow: function (row) {

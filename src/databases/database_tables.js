@@ -46,6 +46,10 @@ Scoped.define("module:Databases.DatabaseTable", [
 				return this.findOne({id : id});
 			},
 			
+			count: function (query) {
+				return this._count(this._encode(query));
+			},
+			
 			_insertRow: function (row) {		
 			},
 			
@@ -53,6 +57,9 @@ Scoped.define("module:Databases.DatabaseTable", [
 			},
 			
 			_updateRow: function (query, row) {
+			},
+			
+			_count: function (query) {				
 			},
 			
 			insertRow: function (row) {

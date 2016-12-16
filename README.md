@@ -1,4 +1,4 @@
-# betajs-server 1.0.12
+# betajs-server 1.0.13
 [![Code Climate](https://codeclimate.com/github/betajs/betajs-server/badges/gpa.svg)](https://codeclimate.com/github/betajs/betajs-server)
 
 
@@ -59,9 +59,10 @@ The BetaJS Server module contains the following subsystems:
 | :--------- | --: |
 | Homepage   | [http://betajs.com](http://betajs.com) |
 | Git        | [git://github.com/betajs/betajs-server.git](git://github.com/betajs/betajs-server.git) |
-| Repository | [http://github.com/betajs/betajs-server](http://github.com/betajs/betajs-server) |
+| Repository | [https://github.com/betajs/betajs-server](https://github.com/betajs/betajs-server) |
 | Blog       | [http://blog.betajs.com](http://blog.betajs.com) | 
 | Twitter    | [http://twitter.com/thebetajs](http://twitter.com/thebetajs) | 
+ 
 
 
 
@@ -94,13 +95,17 @@ The BetaJS Server module contains the following subsystems:
 | betajs-scoped | [Open](https://github.com/betajs/betajs-scoped) |
 
 
-## Contributors
+## Main Contributors
 
 - Oliver Friedmann
-
 
 ## License
 
 Apache-2.0
+
+
+
+
+
 
 

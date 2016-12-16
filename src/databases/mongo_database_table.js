@@ -53,6 +53,14 @@ Scoped.define("module:Databases.MongoDatabaseTable", [
 				}, this);
 			}, this);
 		},
+		
+		_count: function (query) {
+			return this.table().mapSuccess(function (table) {
+				return Promise.funcCallback(table, table.find, query).mapSuccess(function (result) {
+					return Promise.funcCallback(result, result.count);
+				});
+			});
+		},
 	
 		_insertRow: function (row) {
 			return this.table().mapSuccess(function (table) {
