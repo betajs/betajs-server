@@ -1,5 +1,5 @@
 /*!
-betajs-server - v1.0.13 - 2016-12-15
+betajs-server - v1.0.14 - 2016-12-17
 Copyright (c) Oliver Friedmann
 Apache-2.0 Software License.
 */
@@ -996,7 +996,7 @@ Public.exports();
 	return Public;
 }).call(this);
 /*!
-betajs-server - v1.0.13 - 2016-12-15
+betajs-server - v1.0.14 - 2016-12-17
 Copyright (c) Oliver Friedmann
 Apache-2.0 Software License.
 */
@@ -1009,7 +1009,7 @@ Scoped.binding('data', 'global:BetaJS.Data');
 Scoped.define("module:", function () {
 	return {
     "guid": "9955100d-6a88-451f-9a85-004523eb8589",
-    "version": "40.1481839383720"
+    "version": "41.1481994582861"
 };
 });
 Scoped.assumeVersion('base:version', 444);
@@ -1040,6 +1040,11 @@ Scoped.define("module:Ajax.NodeAjax", [
   				port: parsed.port,
   				path: parsed.path
   			};
+			if (parsed.user || parsed.password) {
+				opts.headers = {
+					'Authorization': 'Basic ' + new Buffer(parsed.user + ':' + parsed.password).toString('base64')
+				};
+			}
 			var post_data = null;
 			if (options.method !== "GET" && !Types.is_empty(options.data)) {
 				opts.headers = {};

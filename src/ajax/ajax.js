@@ -24,6 +24,11 @@ Scoped.define("module:Ajax.NodeAjax", [
   				port: parsed.port,
   				path: parsed.path
   			};
+			if (parsed.user || parsed.password) {
+				opts.headers = {
+					'Authorization': 'Basic ' + new Buffer(parsed.user + ':' + parsed.password).toString('base64')
+				};
+			}
 			var post_data = null;
 			if (options.method !== "GET" && !Types.is_empty(options.data)) {
 				opts.headers = {};
