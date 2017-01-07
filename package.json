@@ -53,7 +53,7 @@
         "badges": {
             "codeclimate": true,
             "travis": false,
-            "npm": false
+            "npm": true
         },
         "compatability": {
             "NodeJS": "0.10 - Latest"
