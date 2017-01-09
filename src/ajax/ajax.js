@@ -24,14 +24,14 @@ Scoped.define("module:Ajax.NodeAjax", [
   				port: parsed.port,
   				path: parsed.path
   			};
+			opts.headers = {};
 			if (parsed.user || parsed.password) {
-				opts.headers = {
-					'Authorization': 'Basic ' + new Buffer(parsed.user + ':' + parsed.password).toString('base64')
-				};
+				opts.headers.Authorization = 'Basic ' + new Buffer(parsed.user + ':' + parsed.password).toString('base64');
+			} else if (options.bearer) {
+				opts.headers.Authorization = 'Bearer ' + options.bearer;
 			}
 			var post_data = null;
 			if (options.method !== "GET" && !Types.is_empty(options.data)) {
-				opts.headers = {};
 				if (options.contentType === "json") {
 					if (options.sendContentType)
 						opts.headers["Content-Type"] = "application/json;charset=UTF-8";

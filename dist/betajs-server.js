@@ -1,5 +1,5 @@
 /*!
-betajs-server - v1.0.14 - 2016-12-17
+betajs-server - v1.0.15 - 2017-01-08
 Copyright (c) Oliver Friedmann
 Apache-2.0 Software License.
 */
@@ -996,7 +996,7 @@ Public.exports();
 	return Public;
 }).call(this);
 /*!
-betajs-server - v1.0.14 - 2016-12-17
+betajs-server - v1.0.15 - 2017-01-08
 Copyright (c) Oliver Friedmann
 Apache-2.0 Software License.
 */
@@ -1009,7 +1009,7 @@ Scoped.binding('data', 'global:BetaJS.Data');
 Scoped.define("module:", function () {
 	return {
     "guid": "9955100d-6a88-451f-9a85-004523eb8589",
-    "version": "41.1481994582861"
+    "version": "43.1483886922732"
 };
 });
 Scoped.assumeVersion('base:version', 444);
@@ -1040,14 +1040,14 @@ Scoped.define("module:Ajax.NodeAjax", [
   				port: parsed.port,
   				path: parsed.path
   			};
+			opts.headers = {};
 			if (parsed.user || parsed.password) {
-				opts.headers = {
-					'Authorization': 'Basic ' + new Buffer(parsed.user + ':' + parsed.password).toString('base64')
-				};
+				opts.headers.Authorization = 'Basic ' + new Buffer(parsed.user + ':' + parsed.password).toString('base64');
+			} else if (options.bearer) {
+				opts.headers.Authorization = 'Bearer ' + options.bearer;
 			}
 			var post_data = null;
 			if (options.method !== "GET" && !Types.is_empty(options.data)) {
-				opts.headers = {};
 				if (options.contentType === "json") {
 					if (options.sendContentType)
 						opts.headers["Content-Type"] = "application/json;charset=UTF-8";

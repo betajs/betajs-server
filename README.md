@@ -1,5 +1,6 @@
-# betajs-server 1.0.14
+# betajs-server 1.0.15
 [![Code Climate](https://codeclimate.com/github/betajs/betajs-server/badges/gpa.svg)](https://codeclimate.com/github/betajs/betajs-server)
+[![NPM](https://img.shields.io/npm/v/betajs-server.svg?style=flat)](https://www.npmjs.com/package/betajs-server)
 
 
 BetaJS-Server is a server-side JavaScript framework extension for BetaJS.
