@@ -1,5 +1,5 @@
 /*!
-betajs-server - v1.0.16 - 2017-01-10
+betajs-server - v1.0.17 - 2017-01-15
 Copyright (c) Oliver Friedmann
 Apache-2.0 Software License.
 */
@@ -12,11 +12,11 @@ Scoped.binding('data', 'global:BetaJS.Data');
 Scoped.define("module:", function () {
 	return {
     "guid": "9955100d-6a88-451f-9a85-004523eb8589",
-    "version": "44.1484089436033"
+    "version": "1.0.17"
 };
 });
-Scoped.assumeVersion('base:version', 444);
-Scoped.assumeVersion('data:version', 56);
+Scoped.assumeVersion('base:version', '~1.0.96');
+Scoped.assumeVersion('data:version', '~1.0.41');
 Scoped.define("module:Ajax.NodeAjax", [
     "base:Ajax.Support",
     "base:Net.Uri",
