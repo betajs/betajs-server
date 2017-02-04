@@ -1,5 +1,5 @@
 /*!
-betajs-server - v1.0.17 - 2017-01-15
+betajs-server - v1.0.18 - 2017-02-04
 Copyright (c) Oliver Friedmann
 Apache-2.0 Software License.
 */
@@ -12,7 +12,7 @@ Scoped.binding('data', 'global:BetaJS.Data');
 Scoped.define("module:", function () {
 	return {
     "guid": "9955100d-6a88-451f-9a85-004523eb8589",
-    "version": "1.0.17"
+    "version": "1.0.18"
 };
 });
 Scoped.assumeVersion('base:version', '~1.0.96');
@@ -42,7 +42,7 @@ Scoped.define("module:Ajax.NodeAjax", [
   				method: options.method,
   				host: parsed.host,
   				port: parsed.port,
-  				path: parsed.path
+  				path: parsed.path + (parsed.query ? "?" + parsed.query : "")
   			};
 			opts.headers = {};
 			if (parsed.user || parsed.password) {
@@ -87,9 +87,9 @@ Scoped.define("module:Ajax.NodeAjax", [
   				}).on("end", function () {
   					if (HttpHeader.isSuccessStatus(result.statusCode)) {
 				    	// TODO: Figure out response type.
-				    	AjaxSupport.promiseReturnData(promise, options, data, "json"); //options.decodeType);
+				    	AjaxSupport.promiseReturnData(promise, options, data, options.decodeType || "json");
 			    	} else {
-			    		AjaxSupport.promiseRequestException(promise, result.statusCode, result.statusText, data, "json"); //options.decodeType);)
+			    		AjaxSupport.promiseRequestException(promise, result.statusCode, result.statusText, data, options.decodeType || "json");
 			    	}
   				});
   			});

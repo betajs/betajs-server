@@ -1,7 +1,7 @@
-# betajs-server 1.0.17
+# betajs-server 1.0.18
 [![Code Climate](https://codeclimate.com/github/betajs/betajs-server/badges/gpa.svg)](https://codeclimate.com/github/betajs/betajs-server)
 [![NPM](https://img.shields.io/npm/v/betajs-server.svg?style=flat)](https://www.npmjs.com/package/betajs-server)
-
+[![Gitter Chat](https://badges.gitter.im/betajs/betajs-server.svg)](https://gitter.im/betajs/betajs-server)
 
 BetaJS-Server is a server-side JavaScript framework extension for BetaJS.
 
@@ -63,7 +63,7 @@ The BetaJS Server module contains the following subsystems:
 | Repository | [https://github.com/betajs/betajs-server](https://github.com/betajs/betajs-server) |
 | Blog       | [http://blog.betajs.com](http://blog.betajs.com) | 
 | Twitter    | [http://twitter.com/thebetajs](http://twitter.com/thebetajs) | 
- 
+| Gitter     | [https://gitter.im/betajs/betajs-server](https://gitter.im/betajs/betajs-server) | 
 
 
 

@@ -23,7 +23,7 @@ Scoped.define("module:Ajax.NodeAjax", [
   				method: options.method,
   				host: parsed.host,
   				port: parsed.port,
-  				path: parsed.path
+  				path: parsed.path + (parsed.query ? "?" + parsed.query : "")
   			};
 			opts.headers = {};
 			if (parsed.user || parsed.password) {
@@ -68,9 +68,9 @@ Scoped.define("module:Ajax.NodeAjax", [
   				}).on("end", function () {
   					if (HttpHeader.isSuccessStatus(result.statusCode)) {
 				    	// TODO: Figure out response type.
-				    	AjaxSupport.promiseReturnData(promise, options, data, "json"); //options.decodeType);
+				    	AjaxSupport.promiseReturnData(promise, options, data, options.decodeType || "json");
 			    	} else {
-			    		AjaxSupport.promiseRequestException(promise, result.statusCode, result.statusText, data, "json"); //options.decodeType);)
+			    		AjaxSupport.promiseRequestException(promise, result.statusCode, result.statusText, data, options.decodeType || "json");
 			    	}
   				});
   			});
