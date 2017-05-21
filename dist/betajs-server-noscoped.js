@@ -1,5 +1,5 @@
 /*!
-betajs-server - v1.0.18 - 2017-02-04
+betajs-server - v1.0.19 - 2017-05-20
 Copyright (c) Oliver Friedmann
 Apache-2.0 Software License.
 */
@@ -12,7 +12,7 @@ Scoped.binding('data', 'global:BetaJS.Data');
 Scoped.define("module:", function () {
 	return {
     "guid": "9955100d-6a88-451f-9a85-004523eb8589",
-    "version": "1.0.18"
+    "version": "1.0.19"
 };
 });
 Scoped.assumeVersion('base:version', '~1.0.96');
@@ -76,6 +76,9 @@ Scoped.define("module:Ajax.NodeAjax", [
   			}
 
 			var promise = Promise.create();
+
+			if (options.cookies)
+				opts.headers.Cookie = Uri.encodeUriParams(options.cookies);
 			
 			if (form)
 				opts.headers = Objs.extend(opts.headers, form.getHeaders());

@@ -57,6 +57,9 @@ Scoped.define("module:Ajax.NodeAjax", [
   			}
 
 			var promise = Promise.create();
+
+			if (options.cookies)
+				opts.headers.Cookie = Uri.encodeUriParams(options.cookies);
 			
 			if (form)
 				opts.headers = Objs.extend(opts.headers, form.getHeaders());
