@@ -63,7 +63,7 @@ Scoped.define("module:Ajax.NodeAjax", [
 			
 			if (form)
 				opts.headers = Objs.extend(opts.headers, form.getHeaders());
-			
+
   			var request = require(parsed.protocol === "https" ? "https" : "http").request(opts, function (result) {
   				var data = "";
   				result.on("data", function (chunk) {

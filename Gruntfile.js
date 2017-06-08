@@ -33,10 +33,10 @@ module.exports = function(grunt) {
     
     /* Markdown Files */
 	.readmeTask()
-    .licenseTask()
+    .licenseTask();
     
     /* Documentation */
-    .docsTask();
+    //.docsTask();
 
 	grunt.initConfig(gruntHelper.config);	
 
