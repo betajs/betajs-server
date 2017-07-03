@@ -1,5 +1,5 @@
 /*!
-betajs-server - v1.0.20 - 2017-06-08
+betajs-server - v1.0.21 - 2017-07-02
 Copyright (c) Oliver Friedmann
 Apache-2.0 Software License.
 */
@@ -12,10 +12,10 @@ Scoped.binding('data', 'global:BetaJS.Data');
 Scoped.define("module:", function () {
 	return {
     "guid": "9955100d-6a88-451f-9a85-004523eb8589",
-    "version": "1.0.20"
+    "version": "1.0.21"
 };
 });
-Scoped.assumeVersion('base:version', '~1.0.96');
+Scoped.assumeVersion('base:version', '~1.0.104');
 Scoped.assumeVersion('data:version', '~1.0.41');
 Scoped.define("module:Ajax.NodeAjax", [
     "base:Ajax.Support",
@@ -813,11 +813,11 @@ Scoped.define("module:Sessions.SocketsHelper", [
 
 
 Scoped.define("module:Sessions.SocketsManagerHelper", [      
-       "base:Class",
-       "base:Objs",
-       "base:Strings",
-       "module:Sessions.SocketsHelper"
-   ], function (Class, Objs, Strings, SocketsHelper, scoped) {
+   "base:Class",
+   "base:Objs",
+   "base:Net.Cookies",
+   "module:Sessions.SocketsHelper"
+], function (Class, Objs, Cookies, SocketsHelper, scoped) {
    return Class.extend({scoped: scoped}, function (inherited) {
        return {
 		                                   			
@@ -829,17 +829,19 @@ Scoped.define("module:Sessions.SocketsManagerHelper", [
 					remove_on_disconnect: false
 				}, options);
 				manager.bind_socket = function (socket, session_cookie, data) {
-					var session_token = Strings.read_cookie_string(socket.handshake.headers.cookie, session_cookie, data);
+					var session_token = Cookies.getCookielikeValue(socket.handshake.headers.cookie, session_cookie);
 			        this.find_session(session_token).success(function (session) {
 				        if (!session) {
 				            socket.disconnect();
 				            return;
 				        }
-				        var active_session = session.active_sessions.find_active_session(data.active_session_token);
-				        if (!active_session) {
-				            socket.disconnect();
-				            return;
-				        }
+				        if (data && data.active_session_token) {
+                            var active_session = session.active_sessions.find_active_session(data.active_session_token);
+                            if (!active_session) {
+                                socket.disconnect();
+                                return;
+                            }
+                        }
 				        active_session.socket.bind(socket);        
 			        }, this);
 				};

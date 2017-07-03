@@ -1,6 +1,6 @@
 {
 	"name": "betajs-server",
-	"version": "1.0.20",
+	"version": "1.0.21",
 	"description": "BetaJS-Server is a server-side JavaScript framework extension for BetaJS.",
 	"contributors": ["Oliver Friedmann"],
 	"devDependencies": {
@@ -20,7 +20,7 @@
 	    "grunt-betajs-docs-compile":"~0.0.19",
 	    "betajs-scoped": "~0.0.13",
 	    "betajs-compile": "~0.0.28",
-	    "betajs": "~1.0.96",
+	    "betajs": "~1.0.104",
 	    "betajs-data": "~1.0.41"
 	},
 	"main": "dist/betajs-server.js",

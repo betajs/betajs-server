@@ -51,11 +51,11 @@ Scoped.define("module:Sessions.SocketsHelper", [
 
 
 Scoped.define("module:Sessions.SocketsManagerHelper", [      
-       "base:Class",
-       "base:Objs",
-       "base:Strings",
-       "module:Sessions.SocketsHelper"
-   ], function (Class, Objs, Strings, SocketsHelper, scoped) {
+   "base:Class",
+   "base:Objs",
+   "base:Net.Cookies",
+   "module:Sessions.SocketsHelper"
+], function (Class, Objs, Cookies, SocketsHelper, scoped) {
    return Class.extend({scoped: scoped}, function (inherited) {
        return {
 		                                   			
@@ -67,7 +67,7 @@ Scoped.define("module:Sessions.SocketsManagerHelper", [
 					remove_on_disconnect: false
 				}, options);
 				manager.bind_socket = function (socket, session_cookie, data) {
-					var session_token = Strings.read_cookie_string(socket.handshake.headers.cookie, session_cookie, data);
+					var session_token = Cookies.getCookielikeValue(socket.handshake.headers.cookie, session_cookie);
 			        this.find_session(session_token).success(function (session) {
 				        if (!session) {
 				            socket.disconnect();

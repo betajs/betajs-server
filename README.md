@@ -1,4 +1,4 @@
-# betajs-server 1.0.20
+# betajs-server 1.0.21
 [![Code Climate](https://codeclimate.com/github/betajs/betajs-server/badges/gpa.svg)](https://codeclimate.com/github/betajs/betajs-server)
 [![NPM](https://img.shields.io/npm/v/betajs-server.svg?style=flat)](https://www.npmjs.com/package/betajs-server)
 [![Gitter Chat](https://badges.gitter.im/betajs/betajs-server.svg)](https://gitter.im/betajs/betajs-server)
