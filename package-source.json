@@ -1,6 +1,6 @@
 {
 	"name": "betajs-server",
-	"version": "1.0.21",
+	"version": "1.0.22",
 	"description": "BetaJS-Server is a server-side JavaScript framework extension for BetaJS.",
 	"contributors": ["Oliver Friedmann"],
 	"devDependencies": {

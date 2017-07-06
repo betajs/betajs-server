@@ -68,6 +68,8 @@ Scoped.define("module:Sessions.SocketsManagerHelper", [
 				}, options);
 				manager.bind_socket = function (socket, session_cookie, data) {
 					var session_token = Cookies.getCookielikeValue(socket.handshake.headers.cookie, session_cookie);
+					if (!session_token)
+						session_token = socket.handshake.query[session_cookie];
 			        this.find_session(session_token).success(function (session) {
 				        if (!session) {
 				            socket.disconnect();
