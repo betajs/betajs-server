@@ -33,9 +33,10 @@ Scoped.define("module:Sessions.SocketsHelper", [
 		    
 		    unbind: function () {
 		    	if (this.__socket) {
+		    		var socket = this.__socket;
 			        this.__socket = null;
 			        this.__active_session.activity();
-			        this.__active_session.trigger("unbind_socket");
+			        this.__active_session.trigger("unbind_socket", socket);
 			        if (this.__active_session.session().manager().sockets_manager_helper.__options.remove_on_disconnect)
 			        	this.__active_session.destroy();
 		    	}
