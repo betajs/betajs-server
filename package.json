@@ -58,7 +58,7 @@
             "gitter": true
         },
         "compatability": {
-            "NodeJS": "0.10 - Latest"
+            "NodeJS": "4.0 - Latest"
         },
         "weakDependencies": {
             "betajs-scoped": "https://github.com/betajs/betajs-scoped"
