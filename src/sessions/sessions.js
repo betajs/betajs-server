@@ -130,11 +130,15 @@ Scoped.define("module:Sessions.Manager", [
 		    		async: true
 		    	}, token);
 		    },
+
+			get_session: function (token) {
+				return this.__sessions.get(token);
+			},
 		    
 		    find_session: function (token) {
 		    	if (!token)
 		    		return Promise.value(null);
-		    	var session = this.__sessions.get(token);
+		    	var session = this.get_session(token);
 		    	return session ? Promise.create(session) : this.__lookup_session(token);
 		    },
 		    

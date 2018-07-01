@@ -1,5 +1,5 @@
 /*!
-betajs-server - v1.0.23 - 2017-07-07
+betajs-server - v1.0.23 - 2018-07-01
 Copyright (c) Oliver Friedmann
 Apache-2.0 Software License.
 */
@@ -717,11 +717,15 @@ Scoped.define("module:Sessions.Manager", [
 		    		async: true
 		    	}, token);
 		    },
+
+			get_session: function (token) {
+				return this.__sessions.get(token);
+			},
 		    
 		    find_session: function (token) {
 		    	if (!token)
 		    		return Promise.value(null);
-		    	var session = this.__sessions.get(token);
+		    	var session = this.get_session(token);
 		    	return session ? Promise.create(session) : this.__lookup_session(token);
 		    },
 		    

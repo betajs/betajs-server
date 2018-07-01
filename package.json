@@ -1,5 +1,5 @@
 {
-    "homepage": "http://betajs.com",
+    "homepage": "https://betajs.com",
     "license": "Apache-2.0",
     "licenses": [
         {
@@ -46,8 +46,8 @@
         "url": "git://github.com/betajs/betajs-server.git"
     },
     "meta": {
-        "blog": "http://blog.betajs.com",
-        "twitter": "http://twitter.com/thebetajs",
+        "blog": "https://blog.betajs.com",
+        "twitter": "https://twitter.com/thebetajs",
         "guid": "9955100d-6a88-451f-9a85-004523eb8589",
         "installdoc": "docsrc/common/install.md",
         "summarydoc": "docsrc/common/summary.md",

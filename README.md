@@ -70,7 +70,7 @@ The BetaJS Server module contains the following subsystems:
 ## Compatability
 | Target | Versions |
 | :----- | -------: |
-| NodeJS | 0.10 - Latest |
+| NodeJS | 4.0 - Latest |
 
 
 ## CDN
