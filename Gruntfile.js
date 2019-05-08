@@ -33,6 +33,7 @@ module.exports = function(grunt) {
     
     /* Markdown Files */
 	.readmeTask()
+	.autoincreasepackageTask(null, "package-source.json")
     .licenseTask();
     
     /* Documentation */
@@ -40,7 +41,7 @@ module.exports = function(grunt) {
 
 	grunt.initConfig(gruntHelper.config);	
 
-	grunt.registerTask('default', ['package', 'readme', 'license', 'codeclimate', 'scopedclosurerevision', 'concat-scoped', 'uglify-noscoped', 'uglify-scoped']);
+	grunt.registerTask('default', ['autoincreasepackage', 'package', 'readme', 'license', 'codeclimate', 'scopedclosurerevision', 'concat-scoped', 'uglify-noscoped', 'uglify-scoped']);
 	grunt.registerTask('check', [ 'lint', 'qunit' ]);
 
 };

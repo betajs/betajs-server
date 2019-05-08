@@ -1,5 +1,5 @@
 /*!
-betajs-server - v1.0.23 - 2019-05-07
+betajs-server - v1.0.24 - 2019-05-07
 Copyright (c) Oliver Friedmann
 Apache-2.0 Software License.
 */
@@ -12,8 +12,8 @@ Scoped.binding('data', 'global:BetaJS.Data');
 Scoped.define("module:", function () {
 	return {
     "guid": "9955100d-6a88-451f-9a85-004523eb8589",
-    "version": "1.0.23",
-    "datetime": 1557275810211
+    "version": "1.0.24",
+    "datetime": 1557275930045
 };
 });
 Scoped.assumeVersion('base:version', '~1.0.104');
