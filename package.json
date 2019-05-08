@@ -25,7 +25,7 @@
         "grunt": "",
         "grunt-contrib-jshint": "",
         "grunt-contrib-concat": "",
-        "grunt-contrib-uglify": "~2.3.0",
+        "grunt-contrib-uglify": "^4.0.0",
         "grunt-contrib-clean": "",
         "grunt-preprocess": "",
         "grunt-closure-tools": "",
@@ -41,6 +41,10 @@
         "betajs-data": "~1.0.41"
     },
     "main": "dist/betajs-server.js",
+    "scripts": {
+        "relink": "npm link betajs && npm link betajs-compile && npm link betajs-scoped && npm link betajs-data",
+        "reinstall": "rm -f package-lock.json && rm -rf node_modules && npm i && npm run relink"
+    },
     "repository": {
         "type": "git",
         "url": "git://github.com/betajs/betajs-server.git"

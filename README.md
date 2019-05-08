@@ -58,11 +58,11 @@ The BetaJS Server module contains the following subsystems:
 ## Links
 | Resource   | URL |
 | :--------- | --: |
-| Homepage   | [http://betajs.com](http://betajs.com) |
+| Homepage   | [https://betajs.com](https://betajs.com) |
 | Git        | [git://github.com/betajs/betajs-server.git](git://github.com/betajs/betajs-server.git) |
 | Repository | [https://github.com/betajs/betajs-server](https://github.com/betajs/betajs-server) |
-| Blog       | [http://blog.betajs.com](http://blog.betajs.com) | 
-| Twitter    | [http://twitter.com/thebetajs](http://twitter.com/thebetajs) | 
+| Blog       | [https://blog.betajs.com](https://blog.betajs.com) | 
+| Twitter    | [https://twitter.com/thebetajs](https://twitter.com/thebetajs) | 
 | Gitter     | [https://gitter.im/betajs/betajs-server](https://gitter.im/betajs/betajs-server) | 
 
 

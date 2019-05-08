@@ -1,5 +1,5 @@
 /*!
-betajs-server - v1.0.23 - 2018-07-01
+betajs-server - v1.0.23 - 2019-05-07
 Copyright (c) Oliver Friedmann
 Apache-2.0 Software License.
 */
@@ -12,7 +12,8 @@ Scoped.binding('data', 'global:BetaJS.Data');
 Scoped.define("module:", function () {
 	return {
     "guid": "9955100d-6a88-451f-9a85-004523eb8589",
-    "version": "1.0.23"
+    "version": "1.0.23",
+    "datetime": 1557275810211
 };
 });
 Scoped.assumeVersion('base:version', '~1.0.104');
@@ -703,7 +704,7 @@ Scoped.define("module:Sessions.Manager", [
 		
 		    obtain_session: function (token, options) {
 		    	return this.find_session(token).mapSuccess(function (session) {
-		    		return session || this.new_session(token, options);
+		    		return session || this.new_session(null /*token*/, options);
 		    	}, this);
 		    },
 		    

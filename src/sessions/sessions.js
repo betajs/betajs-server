@@ -116,7 +116,7 @@ Scoped.define("module:Sessions.Manager", [
 		
 		    obtain_session: function (token, options) {
 		    	return this.find_session(token).mapSuccess(function (session) {
-		    		return session || this.new_session(token, options);
+		    		return session || this.new_session(null /*token*/, options);
 		    	}, this);
 		    },
 		    
