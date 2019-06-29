@@ -1,5 +1,5 @@
 /*!
-betajs-server - v1.0.24 - 2019-05-07
+betajs-server - v1.0.25 - 2019-06-28
 Copyright (c) Oliver Friedmann
 Apache-2.0 Software License.
 */
@@ -1006,7 +1006,7 @@ Public.exports();
 	return Public;
 }).call(this);
 /*!
-betajs-server - v1.0.24 - 2019-05-07
+betajs-server - v1.0.25 - 2019-06-28
 Copyright (c) Oliver Friedmann
 Apache-2.0 Software License.
 */
@@ -1019,8 +1019,8 @@ Scoped.binding('data', 'global:BetaJS.Data');
 Scoped.define("module:", function () {
 	return {
     "guid": "9955100d-6a88-451f-9a85-004523eb8589",
-    "version": "1.0.24",
-    "datetime": 1557275930045
+    "version": "1.0.25",
+    "datetime": 1561772447761
 };
 });
 Scoped.assumeVersion('base:version', '~1.0.104');
@@ -1031,9 +1031,8 @@ Scoped.define("module:Ajax.NodeAjax", [
     "base:Net.HttpHeader",
     "base:Promise",
     "base:Objs",
-    "base:Types",
-    "base:Ajax.RequestException"
-], function (AjaxSupport, Uri, HttpHeader, Promise, Objs, Types, RequestException) {
+    "base:Types"
+], function (AjaxSupport, Uri, HttpHeader, Promise, Objs, Types) {
 	
 	var Module = {
 		
@@ -1104,6 +1103,18 @@ Scoped.define("module:Ajax.NodeAjax", [
 			    	}
   				});
   			});
+  			if (options.timeout) {
+				request.on('socket', function(socket) {
+					socket.removeAllListeners('timeout');
+					socket.setTimeout(options.timeout, function() {});
+					socket.on('timeout', function() {
+						request.abort();
+					});
+				}).on('timeout', function() {
+					AjaxSupport.promiseTimeoutException(promise);
+					request.abort();
+				});
+			}
   			if (form)
   				form.pipe(request);
   			else {
@@ -1112,7 +1123,7 @@ Scoped.define("module:Ajax.NodeAjax", [
   				request.end();
   			}
 
-  			return promise;
+			return promise;
 		}
 			
 	};

@@ -15,7 +15,7 @@
         "url": "https://github.com/betajs/betajs-server/issues"
     },
     "name": "betajs-server",
-    "version": "1.0.24",
+    "version": "1.0.25",
     "description": "BetaJS-Server is a server-side JavaScript framework extension for BetaJS.",
     "contributors": [
         "Oliver Friedmann"
@@ -39,6 +39,9 @@
         "betajs-compile": "~0.0.28",
         "betajs": "~1.0.104",
         "betajs-data": "~1.0.41"
+    },
+    "dependencies": {
+        "form-data": "^2.4.0"
     },
     "main": "dist/betajs-server.js",
     "scripts": {

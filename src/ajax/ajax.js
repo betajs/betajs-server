@@ -4,9 +4,8 @@ Scoped.define("module:Ajax.NodeAjax", [
     "base:Net.HttpHeader",
     "base:Promise",
     "base:Objs",
-    "base:Types",
-    "base:Ajax.RequestException"
-], function (AjaxSupport, Uri, HttpHeader, Promise, Objs, Types, RequestException) {
+    "base:Types"
+], function (AjaxSupport, Uri, HttpHeader, Promise, Objs, Types) {
 	
 	var Module = {
 		
@@ -77,6 +76,18 @@ Scoped.define("module:Ajax.NodeAjax", [
 			    	}
   				});
   			});
+  			if (options.timeout) {
+				request.on('socket', function(socket) {
+					socket.removeAllListeners('timeout');
+					socket.setTimeout(options.timeout, function() {});
+					socket.on('timeout', function() {
+						request.abort();
+					});
+				}).on('timeout', function() {
+					AjaxSupport.promiseTimeoutException(promise);
+					request.abort();
+				});
+			}
   			if (form)
   				form.pipe(request);
   			else {
@@ -85,7 +96,7 @@ Scoped.define("module:Ajax.NodeAjax", [
   				request.end();
   			}
 
-  			return promise;
+			return promise;
 		}
 			
 	};
