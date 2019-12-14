@@ -1,10 +1,10 @@
 /*!
-betajs-server - v1.0.25 - 2019-06-28
+betajs-server - v1.0.26 - 2019-12-13
 Copyright (c) Oliver Friedmann
 Apache-2.0 Software License.
 */
 /** @flow **//*!
-betajs-scoped - v0.0.19 - 2018-04-07
+betajs-scoped - v0.0.22 - 2019-10-23
 Copyright (c) Oliver Friedmann
 Apache-2.0 Software License.
 */
@@ -242,13 +242,15 @@ return {
 	 */
 	upgrade: function (namespace/* : ?string */) {
 		var current = Globals.get(namespace || Attach.__namespace);
-		if (current && Helper.typeOf(current) == "object" && current.guid == this.guid && Helper.typeOf(current.version) == "string") {
+		if (current && Helper.typeOf(current) === "object" && current.guid === this.guid && Helper.typeOf(current.version) === "string") {
+			if (this.upgradable === false || current.upgradable === false)
+				return current;
 			var my_version = this.version.split(".");
 			var current_version = current.version.split(".");
 			var newer = false;
 			for (var i = 0; i < Math.min(my_version.length, current_version.length); ++i) {
 				newer = parseInt(my_version[i], 10) > parseInt(current_version[i], 10);
-				if (my_version[i] != current_version[i]) 
+				if (my_version[i] !== current_version[i])
 					break;
 			}
 			return newer ? this.attach(namespace) : current;				
@@ -267,7 +269,7 @@ return {
 		if (namespace)
 			Attach.__namespace = namespace;
 		var current = Globals.get(Attach.__namespace);
-		if (current == this)
+		if (current === this)
 			return this;
 		Attach.__revert = current;
 		if (current) {
@@ -312,7 +314,7 @@ return {
 	 */
 	exports: function (mod, object, forceExport) {
 		mod = mod || (typeof module != "undefined" ? module : null);
-		if (typeof mod == "object" && mod && "exports" in mod && (forceExport || mod.exports == this || !mod.exports || Helper.isEmpty(mod.exports)))
+		if (typeof mod == "object" && mod && "exports" in mod && (forceExport || mod.exports === this || !mod.exports || Helper.isEmpty(mod.exports)))
 			mod.exports = object || this;
 		return this;
 	}	
@@ -828,7 +830,7 @@ function newScope (parent, parentNS, rootNS, globalNS) {
 		
 		
 		/**
-		 * Extends a potentiall existing name space once a list of name space locators is available.
+		 * Extends a potentially existing name space once a list of name space locators is available.
 		 * 
 		 * @param {string} namespaceLocator the name space that is to be defined
 		 * @param {array} dependencies a list of name space locator dependencies (optional)
@@ -964,7 +966,9 @@ var Public = Helper.extend(rootScope, (function () {
 return {
 		
 	guid: "4b6878ee-cb6a-46b3-94ac-27d91f58d666",
-	version: '0.0.19',
+	version: '0.0.22',
+
+	upgradable: true,
 		
 	upgrade: Attach.upgrade,
 	attach: Attach.attach,
@@ -1006,7 +1010,7 @@ Public.exports();
 	return Public;
 }).call(this);
 /*!
-betajs-server - v1.0.25 - 2019-06-28
+betajs-server - v1.0.26 - 2019-12-13
 Copyright (c) Oliver Friedmann
 Apache-2.0 Software License.
 */
@@ -1019,8 +1023,8 @@ Scoped.binding('data', 'global:BetaJS.Data');
 Scoped.define("module:", function () {
 	return {
     "guid": "9955100d-6a88-451f-9a85-004523eb8589",
-    "version": "1.0.25",
-    "datetime": 1561772447761
+    "version": "1.0.26",
+    "datetime": 1576297258739
 };
 });
 Scoped.assumeVersion('base:version', '~1.0.104');
@@ -1853,15 +1857,13 @@ Scoped.define("module:Sessions.SocketsManagerHelper", [
 					remove_on_disconnect: false
 				}, options);
 				manager.bind_socket = function (socket, session_cookie, data) {
-					var session_token = Cookies.getCookielikeValue(socket.handshake.headers.cookie, session_cookie);
-					if (!session_token)
-						session_token = socket.handshake.query[session_cookie];
+					var session_token = socket.handshake.query[session_cookie] || Cookies.getCookielikeValue(socket.handshake.headers.cookie, session_cookie);
 			        this.find_session(session_token).success(function (session) {
 				        if (!session) {
 				            socket.disconnect();
 				            return;
 				        }
-				        var active_session = session.active_sessions.find_active_session(data.active_session_token);
+						var active_session = session.active_sessions.find_active_session(data.active_session_token);
 				        if (!active_session) {
 				            socket.disconnect();
 				            return;

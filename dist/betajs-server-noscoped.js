@@ -1,5 +1,5 @@
 /*!
-betajs-server - v1.0.25 - 2019-06-28
+betajs-server - v1.0.26 - 2019-12-13
 Copyright (c) Oliver Friedmann
 Apache-2.0 Software License.
 */
@@ -12,8 +12,8 @@ Scoped.binding('data', 'global:BetaJS.Data');
 Scoped.define("module:", function () {
 	return {
     "guid": "9955100d-6a88-451f-9a85-004523eb8589",
-    "version": "1.0.25",
-    "datetime": 1561772447761
+    "version": "1.0.26",
+    "datetime": 1576297258739
 };
 });
 Scoped.assumeVersion('base:version', '~1.0.104');
@@ -846,15 +846,13 @@ Scoped.define("module:Sessions.SocketsManagerHelper", [
 					remove_on_disconnect: false
 				}, options);
 				manager.bind_socket = function (socket, session_cookie, data) {
-					var session_token = Cookies.getCookielikeValue(socket.handshake.headers.cookie, session_cookie);
-					if (!session_token)
-						session_token = socket.handshake.query[session_cookie];
+					var session_token = socket.handshake.query[session_cookie] || Cookies.getCookielikeValue(socket.handshake.headers.cookie, session_cookie);
 			        this.find_session(session_token).success(function (session) {
 				        if (!session) {
 				            socket.disconnect();
 				            return;
 				        }
-				        var active_session = session.active_sessions.find_active_session(data.active_session_token);
+						var active_session = session.active_sessions.find_active_session(data.active_session_token);
 				        if (!active_session) {
 				            socket.disconnect();
 				            return;

@@ -68,15 +68,13 @@ Scoped.define("module:Sessions.SocketsManagerHelper", [
 					remove_on_disconnect: false
 				}, options);
 				manager.bind_socket = function (socket, session_cookie, data) {
-					var session_token = Cookies.getCookielikeValue(socket.handshake.headers.cookie, session_cookie);
-					if (!session_token)
-						session_token = socket.handshake.query[session_cookie];
+					var session_token = socket.handshake.query[session_cookie] || Cookies.getCookielikeValue(socket.handshake.headers.cookie, session_cookie);
 			        this.find_session(session_token).success(function (session) {
 				        if (!session) {
 				            socket.disconnect();
 				            return;
 				        }
-				        var active_session = session.active_sessions.find_active_session(data.active_session_token);
+						var active_session = session.active_sessions.find_active_session(data.active_session_token);
 				        if (!active_session) {
 				            socket.disconnect();
 				            return;
