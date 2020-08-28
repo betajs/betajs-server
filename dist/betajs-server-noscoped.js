@@ -1,5 +1,5 @@
 /*!
-betajs-server - v1.0.27 - 2020-08-28
+betajs-server - v1.0.28 - 2020-08-28
 Copyright (c) Oliver Friedmann
 Apache-2.0 Software License.
 */
@@ -12,8 +12,8 @@ Scoped.binding('data', 'global:BetaJS.Data');
 Scoped.define("module:", function () {
 	return {
     "guid": "9955100d-6a88-451f-9a85-004523eb8589",
-    "version": "1.0.27",
-    "datetime": 1598649221371
+    "version": "1.0.28",
+    "datetime": 1598651419749
 };
 });
 Scoped.assumeVersion('base:version', '~1.0.104');
@@ -83,41 +83,53 @@ Scoped.define("module:Ajax.NodeAjax", [
 			if (form)
 				opts.headers = Objs.extend(opts.headers, form.getHeaders());
 
-  			var request = require(parsed.protocol === "https" ? "https" : "http").request(opts, function (result) {
-  				var data = "";
-  				if (options.decodeType === "raw")
-  					result.setEncoding("binary");
-  				result.on("data", function (chunk) {
-  					data += chunk;
-  				}).on("end", function () {
-  					if (HttpHeader.isSuccessStatus(result.statusCode)) {
-				    	// TODO: Figure out response type.
-				    	AjaxSupport.promiseReturnData(promise, options, data, options.decodeType || "json");
-			    	} else {
-			    		AjaxSupport.promiseRequestException(promise, result.statusCode, result.statusText, data, options.decodeType || "json");
-			    	}
-  				});
-  			});
-  			if (options.timeout) {
-				request.on('socket', function(socket) {
-					socket.removeAllListeners('timeout');
-					socket.setTimeout(options.timeout, function() {});
-					socket.on('timeout', function() {
-						request.abort();
-					});
-				}).on('timeout', function() {
-					AjaxSupport.promiseTimeoutException(promise);
-					request.abort();
+			var headerPromise = form ? Promise.create() : Promise.value(true);
+			if (form) {
+				form.getLength(function (err, len) {
+					if (!err) {
+						opts.headers['Content-Length'] = len;
+						headerPromise.asyncSuccess(true);
+					} else
+						headerPromise.asyncError(err);
 				});
 			}
-  			if (form)
-  				form.pipe(request);
-  			else {
-  				if (post_data && post_data.length > 0)
-  					request.write(post_data);
-  				request.end();
-  			}
 
+			headerPromise.forwardError(promise).success(function () {
+				var request = require(parsed.protocol === "https" ? "https" : "http").request(opts, function (result) {
+					var data = "";
+					if (options.decodeType === "raw")
+						result.setEncoding("binary");
+					result.on("data", function (chunk) {
+						data += chunk;
+					}).on("end", function () {
+						if (HttpHeader.isSuccessStatus(result.statusCode)) {
+							// TODO: Figure out response type.
+							AjaxSupport.promiseReturnData(promise, options, data, options.decodeType || "json");
+						} else {
+							AjaxSupport.promiseRequestException(promise, result.statusCode, result.statusText, data, options.decodeType || "json");
+						}
+					});
+				});
+				if (options.timeout) {
+					request.on('socket', function(socket) {
+						socket.removeAllListeners('timeout');
+						socket.setTimeout(options.timeout, function() {});
+						socket.on('timeout', function() {
+							request.abort();
+						});
+					}).on('timeout', function() {
+						AjaxSupport.promiseTimeoutException(promise);
+						request.abort();
+					});
+				}
+				if (form)
+					form.pipe(request);
+				else {
+					if (post_data && post_data.length > 0)
+						request.write(post_data);
+					request.end();
+				}
+			});
 			return promise;
 		}
 			

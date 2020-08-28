@@ -63,41 +63,53 @@ Scoped.define("module:Ajax.NodeAjax", [
 			if (form)
 				opts.headers = Objs.extend(opts.headers, form.getHeaders());
 
-  			var request = require(parsed.protocol === "https" ? "https" : "http").request(opts, function (result) {
-  				var data = "";
-  				if (options.decodeType === "raw")
-  					result.setEncoding("binary");
-  				result.on("data", function (chunk) {
-  					data += chunk;
-  				}).on("end", function () {
-  					if (HttpHeader.isSuccessStatus(result.statusCode)) {
-				    	// TODO: Figure out response type.
-				    	AjaxSupport.promiseReturnData(promise, options, data, options.decodeType || "json");
-			    	} else {
-			    		AjaxSupport.promiseRequestException(promise, result.statusCode, result.statusText, data, options.decodeType || "json");
-			    	}
-  				});
-  			});
-  			if (options.timeout) {
-				request.on('socket', function(socket) {
-					socket.removeAllListeners('timeout');
-					socket.setTimeout(options.timeout, function() {});
-					socket.on('timeout', function() {
-						request.abort();
-					});
-				}).on('timeout', function() {
-					AjaxSupport.promiseTimeoutException(promise);
-					request.abort();
+			var headerPromise = form ? Promise.create() : Promise.value(true);
+			if (form) {
+				form.getLength(function (err, len) {
+					if (!err) {
+						opts.headers['Content-Length'] = len;
+						headerPromise.asyncSuccess(true);
+					} else
+						headerPromise.asyncError(err);
 				});
 			}
-  			if (form)
-  				form.pipe(request);
-  			else {
-  				if (post_data && post_data.length > 0)
-  					request.write(post_data);
-  				request.end();
-  			}
 
+			headerPromise.forwardError(promise).success(function () {
+				var request = require(parsed.protocol === "https" ? "https" : "http").request(opts, function (result) {
+					var data = "";
+					if (options.decodeType === "raw")
+						result.setEncoding("binary");
+					result.on("data", function (chunk) {
+						data += chunk;
+					}).on("end", function () {
+						if (HttpHeader.isSuccessStatus(result.statusCode)) {
+							// TODO: Figure out response type.
+							AjaxSupport.promiseReturnData(promise, options, data, options.decodeType || "json");
+						} else {
+							AjaxSupport.promiseRequestException(promise, result.statusCode, result.statusText, data, options.decodeType || "json");
+						}
+					});
+				});
+				if (options.timeout) {
+					request.on('socket', function(socket) {
+						socket.removeAllListeners('timeout');
+						socket.setTimeout(options.timeout, function() {});
+						socket.on('timeout', function() {
+							request.abort();
+						});
+					}).on('timeout', function() {
+						AjaxSupport.promiseTimeoutException(promise);
+						request.abort();
+					});
+				}
+				if (form)
+					form.pipe(request);
+				else {
+					if (post_data && post_data.length > 0)
+						request.write(post_data);
+					request.end();
+				}
+			});
 			return promise;
 		}
 			
