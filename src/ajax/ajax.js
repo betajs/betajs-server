@@ -26,7 +26,7 @@ Scoped.define("module:Ajax.NodeAjax", [
   			};
 			opts.headers = {};
 			if (parsed.user || parsed.password) {
-				opts.headers.Authorization = 'Basic ' + new Buffer(parsed.user + ':' + parsed.password).toString('base64');
+				opts.headers.Authorization = 'Basic ' + Buffer.from(parsed.user + ':' + parsed.password).toString('base64');
 			} else if (options.bearer) {
 				opts.headers.Authorization = 'Bearer ' + options.bearer;
 			}
@@ -65,6 +65,8 @@ Scoped.define("module:Ajax.NodeAjax", [
 
   			var request = require(parsed.protocol === "https" ? "https" : "http").request(opts, function (result) {
   				var data = "";
+  				if (options.decodeType === "raw")
+  					result.setEncoding("binary");
   				result.on("data", function (chunk) {
   					data += chunk;
   				}).on("end", function () {

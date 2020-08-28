@@ -1,5 +1,5 @@
 /*!
-betajs-server - v1.0.26 - 2019-12-13
+betajs-server - v1.0.27 - 2020-08-28
 Copyright (c) Oliver Friedmann
 Apache-2.0 Software License.
 */
@@ -12,8 +12,8 @@ Scoped.binding('data', 'global:BetaJS.Data');
 Scoped.define("module:", function () {
 	return {
     "guid": "9955100d-6a88-451f-9a85-004523eb8589",
-    "version": "1.0.26",
-    "datetime": 1576297258739
+    "version": "1.0.27",
+    "datetime": 1598649221371
 };
 });
 Scoped.assumeVersion('base:version', '~1.0.104');
@@ -46,7 +46,7 @@ Scoped.define("module:Ajax.NodeAjax", [
   			};
 			opts.headers = {};
 			if (parsed.user || parsed.password) {
-				opts.headers.Authorization = 'Basic ' + new Buffer(parsed.user + ':' + parsed.password).toString('base64');
+				opts.headers.Authorization = 'Basic ' + Buffer.from(parsed.user + ':' + parsed.password).toString('base64');
 			} else if (options.bearer) {
 				opts.headers.Authorization = 'Bearer ' + options.bearer;
 			}
@@ -85,6 +85,8 @@ Scoped.define("module:Ajax.NodeAjax", [
 
   			var request = require(parsed.protocol === "https" ? "https" : "http").request(opts, function (result) {
   				var data = "";
+  				if (options.decodeType === "raw")
+  					result.setEncoding("binary");
   				result.on("data", function (chunk) {
   					data += chunk;
   				}).on("end", function () {
