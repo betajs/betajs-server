@@ -1,5 +1,5 @@
 /*!
-betajs-server - v1.0.28 - 2020-08-28
+betajs-server - v1.0.29 - 2023-12-08
 Copyright (c) Oliver Friedmann
 Apache-2.0 Software License.
 */
@@ -1010,7 +1010,7 @@ Public.exports();
 	return Public;
 }).call(this);
 /*!
-betajs-server - v1.0.28 - 2020-08-28
+betajs-server - v1.0.29 - 2023-12-08
 Copyright (c) Oliver Friedmann
 Apache-2.0 Software License.
 */
@@ -1023,8 +1023,8 @@ Scoped.binding('data', 'global:BetaJS.Data');
 Scoped.define("module:", function () {
 	return {
     "guid": "9955100d-6a88-451f-9a85-004523eb8589",
-    "version": "1.0.28",
-    "datetime": 1598651419749
+    "version": "1.0.29",
+    "datetime": 1702058093514
 };
 });
 Scoped.assumeVersion('base:version', '~1.0.104');
@@ -1573,7 +1573,8 @@ Scoped.define("module:Sessions.RMIHelper", [
 		    	inherited.constructor.call(this);
 		        this.__active_session = active_session;
 		        active_session.rmi = this;
-		        this.__rmi_sender = new ReadySender(new SocketSenderChannel(null, "rmi"));
+				this.__rmi_socket_sender = new SocketSenderChannel(null, "rmi");
+		        this.__rmi_sender = new ReadySender(this.__rmi_socket_sender);
 		        this.__rmi_receiver = new SocketReceiverChannel(null, "rmi");
 		        this.__rmi_peer = new Peer(this.__rmi_sender, this.__rmi_receiver);
 		        active_session.rmi_peer = this.__rmi_peer;
@@ -1583,7 +1584,7 @@ Scoped.define("module:Sessions.RMIHelper", [
 		        active_session.skeletons = this.skeletons;
 		        active_session.on("bind_socket", function (socket) {
 			        this.__rmi_receiver.socket(socket);
-			        this.__rmi_sender.socket(socket);
+			        this.__rmi_socket_sender.socket(socket);
 			        this.__rmi_sender.ready();
 		        }, this);
 		        active_session.on("unbind_socket", function () {
